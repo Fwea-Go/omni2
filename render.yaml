@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: fwea-go-ai-portal
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: "gunicorn app:app"
+    pythonVersion: 3.10.12
+    autoDeploy: true
