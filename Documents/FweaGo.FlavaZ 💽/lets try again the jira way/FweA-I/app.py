@@ -44,6 +44,66 @@ def status():
     })
 
 
+@app.route('/api/tiers')
+def remix_tiers():
+    tiers = [
+        {
+            "id": "jit",
+            "name": "Florida Jit",
+            "price": 50,
+            "description": "Basic flip. Good vibes, quick turnaround.",
+            "features": ["1 Remix", "MP3 Delivery", "2 Revisions"]
+        },
+        {
+            "id": "heat",
+            "name": "Drop That Heat Bwoi!",
+            "price": 150,
+            "description": "Heat pack with extended bounce and polish.",
+            "features": ["2 Remixes", "WAV & MP3", "Stems Included", "4 Revisions"]
+        },
+        {
+            "id": "vibes",
+            "name": "Came For Good Vibes",
+            "price": 300,
+            "description": "Premium treatment. Lush. Festival-ready.",
+            "features": ["Up to 3 Remixes", "HQ Mastering", "Mix Stems", "Unlimited Revisions"]
+        }
+    ]
+    return jsonify(tiers)
+
+
+@app.route('/api/submit', methods=['POST'])
+def submit_track():
+    # Simulate file receipt
+    data = request.get_json()
+    name = data.get("artist_name", "Unknown Artist")
+    tier = data.get("tier", "jit")
+    return jsonify({
+        "status": "success",
+        "message": f"Submission received from {name} for the {tier} package.",
+        "preview_ready_url": "/static/sample-preview.mp3"
+    })
+
+
+@app.route('/api/preview-unlock', methods=['POST'])
+def unlock_preview():
+    data = request.get_json()
+    payment_status = data.get("paid", False)
+
+    if payment_status:
+        return jsonify({
+            "status": "unlocked",
+            "file": "/static/unlocked-preview.mp3"
+        })
+    else:
+        return jsonify({
+            "status": "locked",
+            "message": "Payment required to unlock the full preview."
+        }), 402
+
+
+
+
 
  if __name__ == '__main__':
 
