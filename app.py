@@ -1,57 +1,39 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, jsonify, render_template, send_from_directory
 import os
-import stripe
 
-app = Flask(__name__)
-CORS(app)
-
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
-@app.route("/")
-def home():
-    return "FweA-I API is alive 🎛️"
-
-@app.route("/api/playlists")
-def get_playlists():
-    return jsonify({
-        "originals": [{"title": "Track 1", "file": "/audio/track1-original.mp3"}],
-        "remixes": [{"title": "Remix 1", "file": "/audio/track1-remix.mp3"}]
-    })
-
-@app.route("/api/clean-edit", methods=["POST"])
-def clean_edit():
-    file = request.files["audio"]
-    path = os.path.join(UPLOAD_DIR, "clean_" + file.filename)
-    file.save(path)
-    return jsonify({"message": "Cleaned!", "file": path})
-
-@app.route("/api/master-track", methods=["POST"])
-def master_track():
-    file = request.files["audio"]
-    path = os.path.join(UPLOAD_DIR, "mastered_" + file.filename)
-    file.save(path)
-    return jsonify({"message": "Mastered!", "file": path})
-
-@app.route("/create-checkout-session/<price_id>")
-def create_checkout_session(price_id):
-    session = stripe.checkout.Session.create(
-        line_items=[{"price": price_id, "quantity": 1}],
-        mode='payment',
-        success_url='https://fweagoflavaz.com/success',
-        cancel_url='https://fweagoflavaz.com/cancel',
-    )
-    return jsonify({"id": session.id})
-
+app = Flask(__name__, static_folder='static', template_folder='templates')
 
 @app.route('/')
 def index():
-    file = request.args.get('file')  # like 'generational-money-challenge'
-    if file:
-        audio = f"/uploads/{file}.mp3"  # or however you name it
-    else:
-        audio = None
-    return render_template('index.html', audio=audio)
+    return render_template('index.html')
+
+# Serve original files directly
+@app.route('/originals/<filename>')
+def original_file(filename):
+    return send_from_directory('static/originals', filename)
+
+# Serve remixed files directly
+@app.route('/remixes/<filename>')
+def remix_file(filename):
+    return send_from_directory('static/remixes', filename)
+
+# API endpoint to get matched original/remix pairs
+@app.route('/api/track-list')
+def get_track_list():
+    originals = os.listdir('static/originals')
+    remixes = os.listdir('static/remixes')
+
+    matches = []
+    for file in originals:
+        base = os.path.splitext(file)[0]
+        remix_match = f"{base}.mp3"
+        if remix_match in remixes:
+            matches.append({
+                "name": base.replace('_', ' ').title(),
+                "original": f"/originals/{file}",
+                "remix": f"/remixes/{remix_match}"
+            })
+    return jsonify(matches)
+
+if __name__ == '__main__':
+    app.run(debug=True)
