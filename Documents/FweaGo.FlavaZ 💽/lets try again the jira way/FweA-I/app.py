@@ -34,7 +34,21 @@ def master_track():
     return jsonify({'message': 'Track mastered successfully!', 'file': '/static/sample-mastered.mp3'})
 
 
+
+@app.route('/api/status')
+def status():
+    return jsonify({
+        'status': '✅ FweA-I portal is live!',
+        'message': 'Remix engine running. All vibes secured.',
+        'version': 'v1.0',
+    })
+
+
+
  if __name__ == '__main__':
+
+
+
     port = int(os.environ.get("PORT", 5000))  # Render sets this automatically
     app.run(host="0.0.0.0", port=port, debug=True)
 
