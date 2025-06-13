@@ -33,5 +33,8 @@ def master_track():
     # Simulated endpoint
     return jsonify({'message': 'Track mastered successfully!', 'file': '/static/sample-mastered.mp3'})
 
-if __name__ == '__main__':
-    app.run(debug=True)
+
+ if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))  # Render sets this automatically
+    app.run(host="0.0.0.0", port=port, debug=True)
+
