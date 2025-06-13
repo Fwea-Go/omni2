@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎛️ Fwea-Go Jit: Auto-Scan Playlist</title>
+</head>
+<body style="background:#111;color:white;padding:2rem;font-family:sans-serif;">
+  <h1>🎛️ Fwea-Go Jit: Crossfade Autoscan Experience</h1>
+  <p>Choose a track to load below:</p>
+  <ul id="original-playlist"></ul>
+
+  <script>
+    async function fetchTrackList() {
+      const res = await fetch('/api/track-list');
+      const tracks = await res.json();
+      const list = document.getElementById('original-playlist');
+      list.innerHTML = '';
+      tracks.forEach(t => {
+        const li = document.createElement('li');
+        li.style.cursor = 'pointer';
+        li.innerText = t.name;
+        li.onclick = () => alert(`Now playing:\nOriginal: ${t.original}\nRemix: ${t.remix}`);
+        list.appendChild(li);
+      });
+    }
+    fetchTrackList();
+  </script>
+</body>
+</html>
