@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>💻 Fwea-Go Jit Presentz: The FweA-I Portal</title>
+  <script src="https://unpkg.com/wavesurfer.js"></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div class="theme-selector">
+    <button class="theme-btn theme-dark" onclick="setTheme('dark')">Dark</button>
+    <button class="theme-btn theme-light" onclick="setTheme('light')">Light</button>
+    <button class="theme-btn theme-purple" onclick="setTheme('purple')">Purple</button>
+  </div>
+
+  <div class="playlist-container">
+    <div class="playlist-box">
+      <h3>🎵 Originals</h3>
+      <ul id="original-playlist">
+        <li onclick="loadTracks('track1-original.mp3', 'track1-remix.mp3')">Original Track 1</li>
+        <li onclick="loadTracks('track2-original.mp3', 'track2-remix.mp3')">Original Track 2</li>
+      </ul>
+    </div>
+    <div class="playlist-box">
+      <h3>🎶 Remixes</h3>
+      <ul id="remix-playlist">
+        <li onclick="loadTracks('track1-original.mp3', 'track1-remix.mp3')">Remix of Track 1</li>
+        <li onclick="loadTracks('track2-original.mp3', 'track2-remix.mp3')">Remix of Track 2</li>
+      </ul>
+    </div>
+  </div>
+
+  <h1 class="text-4xl font-bold neon-text mb-4">🏏 Fwea-Go Jit Presentz: The FweA-I Portal</h1>
+  <p class="neon-text mb-8 text-lg tracking-wider">Enjoy the Full FweA-I Crossfade Remix Experience</p>
+
+  <div class="player-box">
+    <div class="control-buttons">
+      <button id="play-btn" class="control-btn">▶ Play</button>
+      <button id="pause-btn" class="control-btn">⏸ Pause</button>
+    </div>
+    <div class="fade-control">
+      <span class="fade-label">🎚 Original</span>
+      <input type="range" id="crossfade" min="0" max="1" step="0.01" class="flex-grow">
+      <span class="fade-label">Remix 🎧</span>
+    </div>
+    <div id="waveform-original">
+      <span class="timestamp" id="timestamp-original">00:00</span>
+    </div>
+    <div id="waveform-remix">
+      <span class="timestamp" id="timestamp-remix">00:00</span>
+    </div>
+    <div class="master-control">
+      <span class="fade-label">🔊 Master</span>
+      <input type="range" id="master-volume" min="0" max="1" step="0.01" class="flex-grow">
+      <span class="fade-label">Volume</span>
+    </div>
+    <div class="loop-toggle">
+      <button id="loop-btn" class="loop-btn">Loop Off</button>
+    </div>
+  </div>
+
+  <section class="tier-section">
+    <h2 class="text-2xl font-bold neon-text mb-6">🔹 Choose Your Remix Experience</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="tier-card">
+        <h3 class="text-xl font-bold neon-text">Florida Jit</h3>
+        <p class="neon-text">$150</p>
+        <p class="text-sm text-white">Basic flip, clean vocal alignment, bounce check</p>
+        <button class="stripe-button mt-4" onclick="checkout('price_id_1')">Book Now</button>
+      </div>
+      <div class="tier-card">
+        <h3 class="text-xl font-bold neon-text">Drop That Heat Bwoi!</h3>
+        <p class="neon-text">$305</p>
+        <p class="text-sm text-white">Intermediate mix, SFX layering, club feel</p>
+        <button class="stripe-button mt-4" onclick="checkout('price_id_2')">Book Now</button>
+      </div>
+      <div class="tier-card">
+        <h3 class="text-xl font-bold neon-text">Came For Good Vibes</h3>
+        <p class="neon-text">$786</p>
+        <p class="text-sm text-white">Top-tier treatment, full FX chain, exclusive edits</p>
+        <button class="stripe-button mt-4" onclick="checkout('price_id_3')">Book Now</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6 text-center">🎧 Submit Your Track for FweA-I Enhancements</h1>
+    <section class="mb-10">
+      <h2 class="text-xl mb-2">🧼 Drag &amp; Drop Clean Version Editor</h2>
+      <form id="cleanForm" class="dropzone">
+        <input type="file" name="audio" accept="audio/*" class="block mb-4 w-full" required>
+        <button type="submit" class="bg-blue-600 button hover:bg-blue-500">Upload &amp; Clean</button>
+      </form>
+      <div id="cleanStatus" class="mt-4 text-sm"></div>
+    </section>
+    <section class="mb-10">
+      <h2 class="text-xl mb-2">🌟 Drag &amp; Drop Song Mastering Optimization</h2>
+      <form id="masterForm" class="dropzone">
+        <input type="file" name="audio" accept="audio/*" class="block mb-4 w-full" required>
+        <button type="submit" class="bg-green-600 button hover:bg-green-500">Upload &amp; Master</button>
+      </form>
+      <div id="masterStatus" class="mt-4 text-sm"></div>
+    </section>
+    <div id="waveform" class="mt-10"></div>
+  </div>
+
+  <div class="playlist-box mt-8">
+    <h3>🔓 Unlock The Hard Drive</h3>
+    <p class="text-sm text-white">Sign up and pay to unlock exclusive archived tracks.</p>
+    <ul id="locked-playlist" class="locked">
+      <li>Exclusive Track 1</li>
+      <li>Exclusive Track 2</li>
+      <li>Exclusive Track 3</li>
+    </ul>
+    <button class="bg-yellow-400 text-black px-4 py-2 mt-2 rounded font-bold" onclick="unlockHardDrive()">Unlock with Stripe</button>
+  </div>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>
