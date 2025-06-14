@@ -1,0 +1,424 @@
+<!-- BANDZOOGLE-READY UI CODE: Paste this into a Bandzoogle custom code block or page section. -->
+
+<!-- Styles (only one <style> block) -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<style>
+  :root {
+    --primary-bg: #121212;
+    --accent-color: #00ffaa;
+    --text-color: #fff;
+  }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--primary-bg);
+    color: var(--text-color);
+    margin: 0;
+    padding: 1rem;
+  }
+  h1, h2, p {
+    text-align: center;
+  }
+  .neon-text {
+    color: var(--accent-color);
+    text-shadow: 0 0 5px var(--accent-color), 0 0 10px var(--accent-color);
+  }
+  .playlist-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+  .playlist-box {
+    flex: 1 1 45%;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    border-radius: 1rem;
+  }
+  .playlist-box h3 {
+    margin-bottom: 1rem;
+    color: var(--accent-color);
+    text-shadow: 0 0 3px var(--accent-color);
+  }
+  .playlist-box ul {
+    list-style: none;
+    padding: 0;
+  }
+  .playlist-box li {
+    padding: 0.5rem;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .playlist-box li:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  .locked {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .player-box {
+    background: radial-gradient(circle at center, #2c3e50, #000);
+    border: 2px solid #00ffaa44;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 0 30px rgba(0, 255, 170, 0.15);
+    position: relative;
+  }
+  .fade-control, .master-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 0 2rem;
+  }
+  .fade-label {
+    color: var(--accent-color);
+    text-shadow: 0 0 3px var(--accent-color);
+    font-weight: bold;
+    width: 100px;
+    text-align: center;
+  }
+  .control-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .control-btn {
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.5rem;
+    background: #00ffaa44;
+    color: #fff;
+    font-weight: bold;
+    border: 2px solid #00ffaa;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  .control-btn:hover {
+    background: #00ffaa;
+    color: #000;
+    text-shadow: 0 0 5px #00ffaa, 0 0 10px #00ffaa;
+  }
+  #waveform-original, #waveform-remix {
+    height: 160px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    position: relative;
+  }
+  .timestamp {
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    font-size: 0.875rem;
+    color: var(--accent-color);
+    text-shadow: 0 0 5px var(--accent-color);
+  }
+  .loop-toggle {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+  .loop-btn {
+    padding: 0.5rem 1rem;
+    background-color: #333;
+    border: 2px solid #00ffaa44;
+    color: #fff;
+    border-radius: 0.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .loop-btn.active {
+    background-color: #00ffaa;
+    color: #000;
+    text-shadow: 0 0 5px #00ffaa, 0 0 10px #00ffaa;
+  }
+  .tier-section {
+    text-align: center;
+  }
+  .tier-card {
+    background: linear-gradient(145deg, #1e1e1e, #2d2d2d);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 0 15px rgba(0, 255, 170, 0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .tier-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 25px rgba(0, 255, 170, 0.3);
+  }
+  .stripe-button {
+    background: #00ffaa;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: bold;
+    color: #000;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00ffaa;
+  }
+  .dropzone {
+    border: 2px dashed #ffffff55;
+    padding: 2rem;
+    border-radius: 1rem;
+    background-color: #1f2937;
+    transition: background-color 0.3s ease;
+  }
+  .dropzone:hover {
+    background-color: #374151;
+  }
+  .button {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+  }
+  @media (max-width: 768px) {
+    .fade-control, .master-control {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .fade-label {
+      width: auto;
+    }
+    .control-buttons {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .playlist-container {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<!-- Scripts (only one set, external libraries first) -->
+<script src="https://unpkg.com/wavesurfer.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
+
+<!-- Main Content -->
+<h1 class="text-4xl font-bold neon-text mb-4">🏏 Fwea-Go Jit Presentz: The FweA-I Portal</h1>
+<p class="neon-text mb-8 text-lg tracking-wider">Enjoy the Full FweA-I Crossfade Remix Experience</p>
+
+<div class="playlist-container">
+  <div class="playlist-box">
+    <h3>🎵 Originals</h3>
+    <ul id="original-playlist">
+      <li onclick="loadTracks('URL_TO_ORIGINAL_1', 'URL_TO_REMIX_1')">Original Track 1</li>
+      <li onclick="loadTracks('URL_TO_ORIGINAL_2', 'URL_TO_REMIX_2')">Original Track 2</li>
+    </ul>
+  </div>
+  <div class="playlist-box">
+    <h3>🎶 Remixes</h3>
+    <ul id="remix-playlist">
+      <li onclick="loadTracks('URL_TO_ORIGINAL_1', 'URL_TO_REMIX_1')">Remix of Track 1</li>
+      <li onclick="loadTracks('URL_TO_ORIGINAL_2', 'URL_TO_REMIX_2')">Remix of Track 2</li>
+    </ul>
+  </div>
+</div>
+
+<div class="player-box">
+  <div class="control-buttons">
+    <button id="play-btn" class="control-btn">▶ Play</button>
+    <button id="pause-btn" class="control-btn">⏸ Pause</button>
+  </div>
+  <div class="fade-control">
+    <span class="fade-label">🎚 Original</span>
+    <input type="range" id="crossfade" min="0" max="1" step="0.01" class="flex-grow">
+    <span class="fade-label">Remix 🎧</span>
+  </div>
+  <div id="waveform-original">
+    <span class="timestamp" id="timestamp-original">00:00</span>
+  </div>
+  <div id="waveform-remix">
+    <span class="timestamp" id="timestamp-remix">00:00</span>
+  </div>
+  <div class="master-control">
+    <span class="fade-label">🔊 Master</span>
+    <input type="range" id="master-volume" min="0" max="1" step="0.01" class="flex-grow">
+    <span class="fade-label">Volume</span>
+  </div>
+  <div class="loop-toggle">
+    <button id="loop-btn" class="loop-btn">Loop Off</button>
+  </div>
+</div>
+
+<section class="tier-section">
+  <h2 class="text-2xl font-bold neon-text mb-6">🔹 Choose Your Remix Experience</h2>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="tier-card">
+      <h3 class="text-xl font-bold neon-text">Florida Jit</h3>
+      <p class="neon-text">$150</p>
+      <p class="text-sm text-white">Basic flip, clean vocal alignment, bounce check</p>
+      <button class="stripe-button mt-4" onclick="checkout('price_id_1')">Book Now</button>
+    </div>
+    <div class="tier-card">
+      <h3 class="text-xl font-bold neon-text">Drop That Heat Bwoi!</h3>
+      <p class="neon-text">$305</p>
+      <p class="text-sm text-white">Intermediate mix, SFX layering, club feel</p>
+      <button class="stripe-button mt-4" onclick="checkout('price_id_2')">Book Now</button>
+    </div>
+    <div class="tier-card">
+      <h3 class="text-xl font-bold neon-text">Came For Good Vibes</h3>
+      <p class="neon-text">$786</p>
+      <p class="text-sm text-white">Top-tier treatment, full FX chain, exclusive edits</p>
+      <button class="stripe-button mt-4" onclick="checkout('price_id_3')">Book Now</button>
+    </div>
+  </div>
+</section>
+
+<!-- Upload Forms -->
+<div class="max-w-4xl mx-auto mt-10">
+  <h1 class="text-3xl font-bold mb-6 text-center">🎧 Submit Your Track for FweA-I Enhancements</h1>
+  <section class="mb-10">
+    <h2 class="text-xl mb-2">🧼 Drag & Drop Clean Version Editor</h2>
+    <form id="cleanForm" class="dropzone">
+      <input type="file" name="audio" accept="audio/*" class="block mb-4 w-full" required>
+      <button type="submit" class="bg-blue-600 button hover:bg-blue-500">Upload & Clean</button>
+    </form>
+    <div id="cleanStatus" class="mt-4 text-sm"></div>
+  </section>
+  <section class="mb-10">
+    <h2 class="text-xl mb-2">🌟 Drag & Drop Song Mastering Optimization</h2>
+    <form id="masterForm" class="dropzone">
+      <input type="file" name="audio" accept="audio/*" class="block mb-4 w-full" required>
+      <button type="submit" class="bg-green-600 button hover:bg-green-500">Upload & Master</button>
+    </form>
+    <div id="masterStatus" class="mt-4 text-sm"></div>
+  </section>
+  <div id="waveform" class="mt-10"></div>
+</div>
+
+<!-- Unlock Section -->
+<div class="playlist-box mt-8">
+  <h3>🔓 Unlock The Hard Drive</h3>
+  <p class="text-sm text-white">Sign up and pay to unlock exclusive archived tracks.</p>
+  <ul id="locked-playlist" class="locked">
+    <li>Exclusive Track 1</li>
+    <li>Exclusive Track 2</li>
+    <li>Exclusive Track 3</li>
+  </ul>
+  <button class="bg-yellow-400 text-black px-4 py-2 mt-2 rounded font-bold" onclick="unlockHardDrive()">Unlock with Stripe</button>
+</div>
+
+<!-- Main JS: Update API URLs to your Render backend! -->
+<script>
+// Stripe checkout (replace with your live/public key)
+const stripe = Stripe("pk_live_51RW06LJ2Iq1764pCr02p7yLia0VqBgUcRfG7Qm5OWFNAwFZcexIs9iBB3B9s22elcQzQjuAUMBxpeUhwcm8hsDf900NbCbF3Vw");
+function checkout(priceId) {
+  stripe.redirectToCheckout({
+    lineItems: [{ price: priceId, quantity: 1 }],
+    mode: 'payment',
+    successUrl: window.location.href,
+    cancelUrl: window.location.href
+  });
+}
+
+// Audio player logic
+let originalPlayer, remixPlayer;
+function loadTracks(originalUrl, remixUrl) {
+  if (originalPlayer) originalPlayer.destroy();
+  if (remixPlayer) remixPlayer.destroy();
+  originalPlayer = WaveSurfer.create({
+    container: '#waveform-original',
+    waveColor: '#888',
+    progressColor: '#00ffaa',
+    height: 100
+  });
+  remixPlayer = WaveSurfer.create({
+    container: '#waveform-remix',
+    waveColor: '#555',
+    progressColor: '#00ffaa',
+    height: 100
+  });
+  originalPlayer.load(originalUrl);
+  remixPlayer.load(remixUrl);
+}
+
+// Crossfade and master volume
+const crossfade = document.getElementById("crossfade");
+const master = document.getElementById("master-volume");
+const loopBtn = document.getElementById("loop-btn");
+const tsOriginal = document.getElementById("timestamp-original");
+const tsRemix = document.getElementById("timestamp-remix");
+const playBtn = document.getElementById("play-btn");
+const pauseBtn = document.getElementById("pause-btn");
+let loopMode = false;
+crossfade.addEventListener("input", () => {
+  if (!originalPlayer || !remixPlayer) return;
+  const val = parseFloat(crossfade.value);
+  originalPlayer.setVolume((1 - val) * parseFloat(master.value));
+  remixPlayer.setVolume(val * parseFloat(master.value));
+});
+master.addEventListener("input", () => {
+  if (!originalPlayer || !remixPlayer) return;
+  const val = parseFloat(master.value);
+  const cross = parseFloat(crossfade.value);
+  originalPlayer.setVolume((1 - cross) * val);
+  remixPlayer.setVolume(cross * val);
+});
+loopBtn.addEventListener("click", () => {
+  loopMode = !loopMode;
+  loopBtn.classList.toggle("active", loopMode);
+  loopBtn.textContent = loopMode ? "Loop On" : "Loop Off";
+  if (originalPlayer) originalPlayer.setLoop(loopMode);
+  if (remixPlayer) remixPlayer.setLoop(loopMode);
+});
+playBtn.addEventListener('click', () => {
+  if (originalPlayer) originalPlayer.play();
+  if (remixPlayer) remixPlayer.play();
+});
+pauseBtn.addEventListener('click', () => {
+  if (originalPlayer) originalPlayer.pause();
+  if (remixPlayer) remixPlayer.pause();
+});
+
+// Upload forms (update URLs to your Render backend!)
+const cleanForm = document.getElementById('cleanForm');
+const masterForm = document.getElementById('masterForm');
+const cleanStatus = document.getElementById('cleanStatus');
+const masterStatus = document.getElementById('masterStatus');
+const handleUpload = async (form, url, statusElement, statusText) => {
+  statusElement.innerText = statusText;
+  const formData = new FormData(form);
+  try {
+    const res = await fetch(url, { method: 'POST', body: formData });
+    const result = await res.json();
+    statusElement.innerText = result.message || 'Done! Download your result.';
+  } catch (error) {
+    statusElement.innerText = '❌ Error: Upload failed.';
+  }
+};
+cleanForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  // TODO: Replace with your Render API endpoint
+  handleUpload(cleanForm, 'https://YOUR-RENDER-URL/api/clean-edit', cleanStatus, 'Processing clean version...');
+});
+masterForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  // TODO: Replace with your Render API endpoint
+  handleUpload(masterForm, 'https://YOUR-RENDER-URL/api/master-track', masterStatus, 'Mastering your track...');
+});
+
+// Unlock section logic (Stripe)
+function unlockHardDrive() {
+  // TODO: Implement Stripe unlock logic or connect to your backend
+  alert('Unlock feature coming soon!');
+}
+</script>
+
+<!-- END BANDZOOGLE UI CODE -->
+
+
+
+
+
+
+
+
+
+
+
+
