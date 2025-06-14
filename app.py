@@ -33,8 +33,6 @@ def master_track():
     # Simulated endpoint
     return jsonify({'message': 'Track mastered successfully!', 'file': '/static/sample-mastered.mp3'})
 
-
-
 @app.route('/api/status')
 def status():
     return jsonify({
@@ -42,7 +40,6 @@ def status():
         'message': 'Remix engine running. All vibes secured.',
         'version': 'v1.0',
     })
-
 
 @app.route('/api/tiers')
 def remix_tiers():
@@ -71,7 +68,6 @@ def remix_tiers():
     ]
     return jsonify(tiers)
 
-
 @app.route('/api/submit', methods=['POST'])
 def submit_track():
     # Simulate file receipt
@@ -83,7 +79,6 @@ def submit_track():
         "message": f"Submission received from {name} for the {tier} package.",
         "preview_ready_url": "/static/sample-preview.mp3"
     })
-
 
 @app.route('/api/preview-unlock', methods=['POST'])
 def unlock_preview():
@@ -101,17 +96,6 @@ def unlock_preview():
             "message": "Payment required to unlock the full preview."
         }), 402
 
-
-
-
-
-
-
-
- if __name__ == '__main__':
-
-
-
+if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))  # Render sets this automatically
     app.run(host="0.0.0.0", port=port, debug=True)
-
