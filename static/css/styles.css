@@ -1,0 +1,181 @@
+:root {
+  --primary-bg: #121212;
+  --accent-color: #00ffaa;
+  --text-color: #fff;
+}
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--primary-bg);
+  color: var(--text-color);
+  margin: 0;
+  padding: 1rem;
+}
+h1, h2, p {
+  text-align: center;
+}
+.neon-text {
+  color: var(--accent-color);
+  text-shadow: 0 0 5px var(--accent-color), 0 0 10px var(--accent-color);
+}
+.playlist-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+.playlist-box {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 1rem;
+}
+.playlist-box h3 {
+  margin-bottom: 1rem;
+  color: var(--accent-color);
+  text-shadow: 0 0 3px var(--accent-color);
+}
+.playlist-box ul {
+  list-style: none;
+  padding: 0;
+}
+.playlist-box li {
+  padding: 0.5rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.playlist-box li:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.player-box {
+  background: radial-gradient(circle at center, #2c3e50, #000);
+  border: 2px solid #00ffaa44;
+  border-radius: 1rem;
+  padding: 2rem;
+  margin-bottom: 3rem;
+  box-shadow: 0 0 30px rgba(0, 255, 170, 0.15);
+  position: relative;
+}
+.fade-control, .master-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  padding: 0 2rem;
+}
+.fade-label {
+  color: #00ffaa;
+  text-shadow: 0 0 3px #00ffaa;
+  font-weight: bold;
+  width: 100px;
+  text-align: center;
+}
+.control-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+.control-btn {
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  background: #00ffaa44;
+  color: #fff;
+  font-weight: bold;
+  border: 2px solid #00ffaa;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.control-btn:hover {
+  background: #00ffaa;
+  color: #000;
+  text-shadow: 0 0 5px #00ffaa, 0 0 10px #00ffaa;
+}
+#waveform-original, #waveform-remix {
+  height: 160px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  position: relative;
+}
+.timestamp {
+  position: absolute;
+  top: 0.5rem;
+  right: 1rem;
+  font-size: 0.875rem;
+  color: #00ffaa;
+  text-shadow: 0 0 5px #00ffaa;
+}
+.loop-toggle {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+.loop-btn {
+  padding: 0.5rem 1rem;
+  background-color: #333;
+  border: 2px solid #00ffaa44;
+  color: #fff;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.loop-btn.active {
+  background-color: #00ffaa;
+  color: #000;
+  text-shadow: 0 0 5px #00ffaa, 0 0 10px #00ffaa;
+}
+.tier-section {
+  text-align: center;
+}
+.tier-card {
+  background: linear-gradient(145deg, #1e1e1e, #2d2d2d);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 0 15px rgba(0, 255, 170, 0.15);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.tier-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 25px rgba(0, 255, 170, 0.3);
+}
+.stripe-button {
+  background: #00ffaa;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  color: #000;
+  cursor: pointer;
+  box-shadow: 0 0 10px #00ffaa;
+}
+@media (max-width: 768px) {
+  .fade-control, .master-control {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .fade-label {
+    width: auto;
+  }
+  .control-buttons {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+.dropzone {
+  border: 2px dashed #ffffff55;
+  padding: 2rem;
+  border-radius: 1rem;
+  background-color: #1f2937;
+  transition: background-color 0.3s ease;
+}
+.dropzone:hover {
+  background-color: #374151;
+}
+.button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}

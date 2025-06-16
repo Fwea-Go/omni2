@@ -1,6 +1,0 @@
-flask
-stripe
-pydub
-numpy
-scipy
-openai-whisper

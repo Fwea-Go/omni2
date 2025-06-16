@@ -1,7 +1,0 @@
-flask
-flask-cors
-stripe
-pydub
-numpy
-scipy
-openai-whisper
