@@ -1,21 +1,20 @@
-name = "fwea-i-backend"
+name = "omni2"
 main = "src/worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Development environment
 [env.development]
-vars = { 
+
   ENVIRONMENT = "development",
   FRONTEND_URL = "http://localhost:3000"
-}
 
 # Production environment  
 [env.production]
-vars = { 
+
   ENVIRONMENT = "production",
-  FRONTEND_URL = "https://your-pages-domain.pages.dev"
-}
+  FRONTEND_URL = "https://omni2-8d2.pages.dev/"
+
 
 # Secrets (add these via wrangler secret put)
 # Required secrets to add manually:
