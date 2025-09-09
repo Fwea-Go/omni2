@@ -1,0 +1,92 @@
+name = "fwea-i-backend"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Development environment
+[env.development]
+vars = { 
+  ENVIRONMENT = "development",
+  FRONTEND_URL = "http://localhost:3000"
+}
+
+# Production environment  
+[env.production]
+vars = { 
+  ENVIRONMENT = "production",
+  FRONTEND_URL = "https://your-pages-domain.pages.dev"
+}
+
+# Secrets (add these via wrangler secret put)
+# Required secrets to add manually:
+# wrangler secret put STRIPE_SECRET_KEY
+# wrangler secret put STRIPE_WEBHOOK_SECRET  
+# wrangler secret put OPENAI_API_KEY (optional)
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "fwea-database"
+database_id = "your-d1-database-id-here"
+preview_database_id = "your-preview-database-id-here"
+
+# R2 Storage binding for audio files
+[[r2_buckets]]
+binding = "AUDIO_STORAGE"
+bucket_name = "fwea-audio-files"
+preview_bucket_name = "fwea-audio-files-preview"
+
+# AI binding for Cloudflare Workers AI
+[ai]
+binding = "AI"
+
+# KV binding for caching and rate limiting
+[[kv_namespaces]]
+binding = "CACHE"
+id = "your-kv-namespace-id-here"
+preview_id = "your-preview-kv-namespace-id-here"
+
+# Analytics Engine for usage tracking
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "fwea_analytics"
+
+# Queue binding for background processing
+[[queues]]
+binding = "AUDIO_QUEUE"
+queue = "fwea-audio-processing"
+
+# Durable Objects for real-time features
+[[durable_objects.bindings]]
+name = "PROCESSING_STATE"
+class_name = "ProcessingState"
+
+# Worker configuration
+[build]
+command = ""
+
+# Resource limits
+[limits]
+cpu_ms = 50000
+
+# Custom domains (uncomment and modify)
+# routes = [
+#   { pattern = "api.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+# Cron triggers for maintenance
+[[triggers.crons]]
+cron = "0 2 * * *"  # Daily at 2 AM UTC
+name = "cleanup-expired-files"
+
+[[triggers.crons]] 
+cron = "0 0 * * SUN"  # Weekly on Sunday
+name = "generate-analytics-report"
+
+# Placement for optimal performance
+[placement]
+mode = "smart"
+
+# Browser rendering for advanced features (optional)
+# [browser]
+# binding = "BROWSER"
