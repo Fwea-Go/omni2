@@ -51,7 +51,7 @@ binding = "ANALYTICS"
 dataset = "fwea_analytics"
 
 # Queue binding for background processing
-[queues.myQueue]
+[queues]
 binding = "AUDIO_QUEUE"
 queue = "fwea-audio-processing"
 
