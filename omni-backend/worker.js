@@ -56,7 +56,7 @@ export class ProcessingState {
   }
   // Example storage and fetch API
   async fetch(request) {
-    return new Response('Durable Object active');
+    return new Response('Durable Object V2 Active');
   }
 }
 
