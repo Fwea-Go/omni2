@@ -42,7 +42,7 @@ binding = "AI"
 # KV binding for caching and rate limiting
 [[kv_namespaces]]
 binding = "CACHE"
-id = "your-kv-namespace-id-here"
+id = "427859929f0b4b63b3b1c1376eb5b798"
 preview_id = "your-preview-kv-namespace-id-here"
 
 # Analytics Engine for usage tracking
