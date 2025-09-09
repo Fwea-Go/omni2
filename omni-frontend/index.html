@@ -1609,9 +1609,9 @@
                     referrer: document.referrer
                 };
 
-                const existingData = JSON.parse(localStorage.getItem('fwea_analytics') || '[]');
+                const existingData = JSON.parse(localStorage.getItem('omni_analytics') || '[]');
                 existingData.push(data);
-                localStorage.setItem('fwea_analytics', JSON.stringify(existingData.slice(-50)));
+                localStorage.setItem('omni_analytics', JSON.stringify(existingData.slice(-50)));
 
                 fetch(`${CONFIG.API_BASE_URL}/track-event`, {
                     method: 'POST',
@@ -1684,7 +1684,7 @@
         let stripe = null;
 
         // Initialize Stripe
-        if (CONFIG.STRIPE_PUBLISHABLE_KEY !== 'pk_live_YOUR_PUBLISHABLE_KEY_HERE') {
+        if (CONFIG.STRIPE_PUBLISHABLE_KEY !== 'pk_live_51RW06LJ2Iq1764pCr02p7yLia0VqBgUcRfG7Qm5OWFNAwFZcexIs9iBB3B9s22elcQzQjuAUMBxpeUhwcm8hsDf900NbCbF3Vw') {
             stripe = Stripe(CONFIG.STRIPE_PUBLISHABLE_KEY);
         }
 
