@@ -49,6 +49,17 @@ export default {
   },
 };
 
+export class ProcessingState {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+  // Example storage and fetch API
+  async fetch(request) {
+    return new Response('Durable Object active');
+  }
+}
+
 // YOUR STRIPE PRICE IDs CONFIGURATION
 const STRIPE_PRICE_IDS = {
   SINGLE_TRACK: 'price_1S4NnmJ2Iq1764pCjA9xMnrn',
