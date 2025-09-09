@@ -60,6 +60,10 @@ queue = "fwea-audio-processing"
 name = "PROCESSING_STATE"
 class_name = "ProcessingState"
 
+[[migrations]]
+tag = "v1"
+new_classes = [ "ProcessingState" ]
+
 # Worker configuration
 [build]
 command = ""
