@@ -63,7 +63,7 @@ class_name = "ProcessingState"
 
 
 [[migrations]]
-tag = "v3"  # Bump this one higher than any previous tags
+tag = "v1"
 new_classes = [ "ProcessingState" ]
 new_sqlite_classes = [ "ProcessingState" ]
 
