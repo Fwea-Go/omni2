@@ -82,13 +82,12 @@ command = ""
 # ]
 
 # Cron triggers for maintenance
-[[triggers.crons]]
-cron = "0 2 * * *"  # Daily at 2 AM UTC
-name = "cleanup-expired-files"
+[triggers]
+crons = [
+  "0 2 * * *",               # every day at 2 AM UTC
+  "0 0 * * SUN"              # every Sunday at midnight UTC
+]
 
-[[triggers.crons]] 
-cron = "0 0 * * SUN"  # Weekly on Sunday
-name = "generate-analytics-report"
 
 # Placement for optimal performance
 [placement]
