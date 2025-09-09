@@ -942,7 +942,7 @@ class Stripe {
   }
 }
 
-export class ProcessingStateV2 {
+class ProcessingStateV2 {
   constructor(state, env) {
     this.state = state;
     this.env = env;
@@ -952,3 +952,5 @@ export class ProcessingStateV2 {
     return new Response('Durable Object V2 Active');
   }
 }
+
+export { ProcessingStateV2 };
