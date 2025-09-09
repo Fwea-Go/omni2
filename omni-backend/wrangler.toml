@@ -62,10 +62,6 @@ name = "PROCESSING_STATE"
 class_name = "ProcessingState"
 
 
-[[migrations]]
-tag = "v1"
-new_classes = [ "ProcessingState" ]
-new_sqlite_classes = [ "ProcessingState" ]
 
 [[migrations]]
 tag = "v2"
