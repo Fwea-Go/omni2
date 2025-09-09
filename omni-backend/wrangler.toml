@@ -63,7 +63,6 @@ class_name = "ProcessingState"
 
 [[migrations]]
 tag = "v1"
-new_classes = [ "ProcessingState" ]
 new_sqlite_classes = [ "ProcessingState" ]
 
 # Worker configuration
