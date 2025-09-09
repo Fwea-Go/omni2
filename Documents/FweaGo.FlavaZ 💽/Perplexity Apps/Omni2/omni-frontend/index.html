@@ -1,0 +1,2156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FWEA-I Omnilingual Clean Version Editor | Professional Audio Cleaning</title>
+    <meta name="description" content="Professional omnilingual audio profanity removal tool for DJs, artists, and content creators. Clean audio in 100+ languages with AI-powered precision.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        :root {
+            /* Primary Brand Colors */
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #121212;
+            --surface-bg: #1a1a1a;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            
+            /* Accent Colors */
+            --electric-blue: #00d4ff;
+            --teal-green: #00ff88;
+            --soft-purple: #a855f7;
+            --sandy-tone: #f5deb3;
+            --accent-gradient: linear-gradient(135deg, var(--electric-blue), var(--teal-green));
+            --purple-gradient: linear-gradient(135deg, var(--soft-purple), var(--electric-blue));
+            
+            /* Text Colors */
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-accent: var(--electric-blue);
+            
+            /* Status Colors */
+            --success: var(--teal-green);
+            --warning: #ffa500;
+            --error: #ff4444;
+            
+            /* Typography */
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-weight-light: 300;
+            --font-weight-normal: 400;
+            --font-weight-medium: 500;
+            --font-weight-semibold: 600;
+            --font-weight-bold: 700;
+            --font-weight-extrabold: 800;
+            
+            /* Spacing */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2rem;
+            --space-2xl: 3rem;
+            --space-3xl: 4rem;
+            
+            /* Border Radius */
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --radius-2xl: 1.5rem;
+            --radius-full: 9999px;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.3);
+            
+            /* Transitions */
+            --transition-fast: 150ms ease;
+            --transition-normal: 300ms ease;
+            --transition-slow: 500ms ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        /* Glassmorphism Container */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-xl);
+        }
+        
+        /* Header */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: var(--space-lg) 0;
+        }
+        
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 var(--space-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+        
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--accent-gradient);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: var(--font-weight-bold);
+            color: var(--primary-bg);
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: var(--font-weight-extrabold);
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .logo-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: var(--font-weight-medium);
+        }
+        
+        .nav {
+            display: flex;
+            gap: var(--space-xl);
+        }
+        
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: var(--font-weight-medium);
+            transition: var(--transition-fast);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-md);
+        }
+        
+        .nav-link:hover {
+            color: var(--text-accent);
+            background: rgba(0, 212, 255, 0.1);
+        }
+        
+        /* Main Container */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--space-3xl) var(--space-lg);
+        }
+        
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            margin-bottom: var(--space-3xl);
+        }
+        
+        .hero-title {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: var(--font-weight-extrabold);
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: var(--space-lg);
+            line-height: 1.1;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto var(--space-xl);
+            line-height: 1.6;
+        }
+        
+        .hero-features {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-xl);
+            flex-wrap: wrap;
+            margin-bottom: var(--space-2xl);
+        }
+        
+        .hero-feature {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-weight: var(--font-weight-medium);
+            color: var(--teal-green);
+        }
+        
+        .hero-feature-icon {
+            font-size: 1.25rem;
+        }
+        
+        /* Upload Section */
+        .upload-section {
+            margin-bottom: var(--space-3xl);
+        }
+        
+        .upload-area {
+            position: relative;
+            padding: var(--space-3xl);
+            text-align: center;
+            border: 2px dashed var(--glass-border);
+            border-radius: var(--radius-2xl);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            transition: var(--transition-normal);
+            cursor: pointer;
+            overflow: hidden;
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: var(--accent-gradient);
+            border-radius: var(--radius-2xl);
+            opacity: 0;
+            transition: var(--transition-normal);
+            z-index: -1;
+        }
+        
+        .upload-area:hover::before,
+        .upload-area.drag-over::before {
+            opacity: 0.1;
+        }
+        
+        .upload-area:hover,
+        .upload-area.drag-over {
+            border-color: var(--electric-blue);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: var(--space-lg);
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .upload-title {
+            font-size: 2rem;
+            font-weight: var(--font-weight-bold);
+            margin-bottom: var(--space-md);
+        }
+        
+        .upload-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xl);
+            font-size: 1.125rem;
+        }
+        
+        .supported-formats {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-md);
+            margin: var(--space-xl) 0;
+            flex-wrap: wrap;
+        }
+        
+        .format-badge {
+            padding: var(--space-sm) var(--space-md);
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: var(--radius-full);
+            color: var(--teal-green);
+            font-size: 0.875rem;
+            font-weight: var(--font-weight-medium);
+            transition: var(--transition-fast);
+        }
+        
+        .format-badge:hover {
+            background: rgba(0, 255, 136, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .upload-btn {
+            background: var(--accent-gradient);
+            border: none;
+            padding: var(--space-lg) var(--space-2xl);
+            border-radius: var(--radius-lg);
+            color: var(--primary-bg);
+            font-weight: var(--font-weight-bold);
+            font-size: 1.125rem;
+            cursor: pointer;
+            transition: var(--transition-normal);
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        /* Processing Section */
+        .processing-section {
+            display: none;
+            margin-bottom: var(--space-3xl);
+        }
+        
+        .processing-card {
+            padding: var(--space-2xl);
+            text-align: center;
+        }
+        
+        .processing-title {
+            font-size: 1.5rem;
+            font-weight: var(--font-weight-bold);
+            margin-bottom: var(--space-lg);
+        }
+        
+        .processing-status {
+            color: var(--electric-blue);
+            font-weight: var(--font-weight-medium);
+            margin-bottom: var(--space-md);
+            font-size: 1.125rem;
+        }
+        
+        .language-detection {
+            margin: var(--space-xl) 0;
+            padding: var(--space-lg);
+            background: rgba(168, 85, 247, 0.1);
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+        }
+        
+        .detected-languages {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-sm);
+            flex-wrap: wrap;
+            margin-top: var(--space-md);
+        }
+        
+        .language-tag {
+            padding: var(--space-xs) var(--space-md);
+            background: rgba(168, 85, 247, 0.2);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: var(--radius-full);
+            color: var(--soft-purple);
+            font-size: 0.875rem;
+            font-weight: var(--font-weight-medium);
+            animation: fadeInUp 0.5s ease;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            margin: var(--space-xl) 0;
+        }
+        
+        .progress-stages {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: var(--space-lg);
+            position: relative;
+        }
+        
+        .progress-stages::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--glass-border);
+            z-index: 1;
+        }
+        
+        .progress-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            height: 2px;
+            background: var(--accent-gradient);
+            width: 0%;
+            transition: var(--transition-slow);
+            z-index: 2;
+        }
+        
+        .stage {
+            position: relative;
+            z-index: 3;
+            text-align: center;
+        }
+        
+        .stage-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--surface-bg);
+            border: 2px solid var(--glass-border);
+            margin: 0 auto var(--space-sm);
+            transition: var(--transition-normal);
+        }
+        
+        .stage.active .stage-dot,
+        .stage.completed .stage-dot {
+            background: var(--electric-blue);
+            border-color: var(--electric-blue);
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+        
+        .stage-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: var(--font-weight-medium);
+            max-width: 80px;
+        }
+        
+        .stage.active .stage-label,
+        .stage.completed .stage-label {
+            color: var(--electric-blue);
+        }
+        
+        .progress-bar {
+            height: 12px;
+            background: var(--surface-bg);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            position: relative;
+            margin: var(--space-lg) 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-gradient);
+            width: 0%;
+            transition: var(--transition-slow);
+            position: relative;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+        
+        .progress-percentage {
+            color: var(--electric-blue);
+            font-weight: var(--font-weight-bold);
+        }
+        
+        .time-remaining {
+            color: var(--text-secondary);
+        }
+        
+        /* Audio Player */
+        .audio-player {
+            display: none;
+            margin-bottom: var(--space-3xl);
+        }
+        
+        .player-card {
+            padding: var(--space-2xl);
+        }
+        
+        .player-title {
+            font-size: 1.5rem;
+            font-weight: var(--font-weight-bold);
+            margin-bottom: var(--space-lg);
+            text-align: center;
+        }
+        
+        .waveform-container {
+            background: var(--surface-bg);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-lg);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .waveform {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(90deg, var(--electric-blue), var(--teal-green));
+            border-radius: var(--radius-md);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .waveform::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0px,
+                transparent 2px,
+                rgba(255, 255, 255, 0.1) 2px,
+                rgba(255, 255, 255, 0.1) 4px
+            );
+            animation: waveAnimation 3s ease-in-out infinite;
+        }
+        
+        @keyframes waveAnimation {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+        
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--space-lg);
+            justify-content: center;
+            margin-bottom: var(--space-lg);
+        }
+        
+        .play-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--accent-gradient);
+            border: none;
+            color: var(--primary-bg);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition-normal);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        .time-display {
+            font-family: 'Courier New', monospace;
+            color: var(--text-secondary);
+            font-size: 1.125rem;
+            font-weight: var(--font-weight-medium);
+        }
+        
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+        
+        .volume-slider {
+            width: 100px;
+            height: 4px;
+            background: var(--surface-bg);
+            border-radius: var(--radius-full);
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-lg);
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: var(--space-md) var(--space-xl);
+            border-radius: var(--radius-lg);
+            border: none;
+            font-weight: var(--font-weight-semibold);
+            cursor: pointer;
+            transition: var(--transition-normal);
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: 1rem;
+        }
+        
+        .btn-secondary {
+            background: var(--surface-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--glass-border);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--glass-bg);
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: var(--primary-bg);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        /* Pricing Section */
+        .pricing-section {
+            margin: var(--space-3xl) 0;
+        }
+        
+        .pricing-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: var(--font-weight-bold);
+            margin-bottom: var(--space-xl);
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--space-xl);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .pricing-card {
+            padding: var(--space-2xl);
+            text-align: center;
+            position: relative;
+            transition: var(--transition-normal);
+        }
+        
+        .pricing-card:hover {
+            transform: translateY(-4px);
+        }
+        
+        .pricing-card.featured {
+            border: 2px solid var(--electric-blue);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        .pricing-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent-gradient);
+            color: var(--primary-bg);
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--radius-full);
+            font-size: 0.875rem;
+            font-weight: var(--font-weight-bold);
+        }
+        
+        .pricing-tier {
+            font-size: 1.25rem;
+            font-weight: var(--font-weight-bold);
+            margin-bottom: var(--space-md);
+            text-align: center;
+        }
+        
+        .pricing-price {
+            font-size: 3rem;
+            font-weight: var(--font-weight-extrabold);
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: var(--space-sm);
+            text-align: center;
+        }
+        
+        .pricing-period {
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xl);
+            text-align: center;
+        }
+        
+        .pricing-features {
+            list-style: none;
+            margin-bottom: var(--space-xl);
+            text-align: center;
+        }
+        
+        .pricing-feature {
+            padding: var(--space-sm) 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+        }
+        
+        .pricing-feature-icon {
+            color: var(--teal-green);
+            font-size: 1.125rem;
+        }
+        
+        .pricing-btn {
+            width: 100%;
+            padding: var(--space-lg);
+            font-size: 1.125rem;
+        }
+        
+        /* Language Banner */
+        .language-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+            z-index: 50;
+            overflow: hidden;
+        }
+        
+        .language-scroll {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            animation: scroll-infinite 200s linear infinite;
+            gap: var(--space-xl);
+            white-space: nowrap;
+        }
+        
+        @keyframes scroll-infinite {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        
+        .language-item {
+            white-space: nowrap;
+            font-weight: var(--font-weight-medium);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-md);
+            transition: var(--transition-fast);
+            flex-shrink: 0;
+        }
+        
+        .language-item:nth-child(4n+1) { color: var(--electric-blue); background: rgba(0, 212, 255, 0.1); }
+        .language-item:nth-child(4n+2) { color: var(--teal-green); background: rgba(0, 255, 136, 0.1); }
+        .language-item:nth-child(4n+3) { color: var(--soft-purple); background: rgba(168, 85, 247, 0.1); }
+        .language-item:nth-child(4n+4) { color: var(--sandy-tone); background: rgba(245, 222, 179, 0.1); }
+        
+        /* Footer */
+        .footer {
+            margin-top: var(--space-3xl);
+            padding: var(--space-2xl) var(--space-lg) 80px;
+            text-align: center;
+            border-top: 1px solid var(--glass-border);
+            background: var(--surface-bg);
+        }
+        
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .footer-copyright {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: var(--space-md);
+        }
+        
+        .footer-brand {
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: var(--font-weight-bold);
+        }
+        
+        /* Enhanced Animations */
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 0.6; transform: scale(1); }
+        }
+        
+        .premium-glow {
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+            border: 2px solid var(--electric-blue);
+        }
+        
+        .conversion-highlight {
+            animation: pulseGlow 2s infinite;
+        }
+        
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(0, 212, 255, 0.6); }
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: var(--space-xl) var(--space-md);
+            }
+            
+            .hero-features {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .upload-area {
+                padding: var(--space-xl);
+            }
+            
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .nav {
+                display: none;
+            }
+            
+            .header-container {
+                padding: 0 var(--space-md);
+            }
+        }
+        
+        /* Utility Classes */
+        .hidden { display: none; }
+        .fade-in { animation: fadeIn 0.5s ease; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .text-center { text-align: center; }
+        .mb-0 { margin-bottom: 0; }
+        
+        /* Admin Override */
+        .admin-mode .pricing-card {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        .admin-mode .pricing-card::after {
+            content: 'ADMIN - FREE ACCESS';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--accent-gradient);
+            color: var(--primary-bg);
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--radius-md);
+            font-weight: var(--font-weight-bold);
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-container">
+            <div class="logo">
+                <div class="logo-icon">F</div>
+                <div>
+                    <div class="logo-text">FWEA-I</div>
+                    <div class="logo-subtitle">Omnilingual Clean Version Editor</div>
+                </div>
+            </div>
+            <nav class="nav">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#pricing" class="nav-link">Pricing</a>
+                <a href="#languages" class="nav-link">Languages</a>
+                <a href="#support" class="nav-link">Support</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1 class="hero-title">Professional Audio Cleaning<br>In 100+ Languages</h1>
+            <p class="hero-subtitle">The world's most advanced omnilingual profanity removal tool. Perfect for DJs, artists, and content creators who demand pristine audio quality.</p>
+            
+            <div class="hero-features">
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">🌍</span>
+                    <span>100+ Languages Supported</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">🎯</span>
+                    <span>AI-Powered Precision</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">⚡</span>
+                    <span>Lightning Fast Processing</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">🔒</span>
+                    <span>Studio-Grade Security</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <div class="upload-area glass" id="uploadArea">
+                <div class="upload-icon">🎵</div>
+                <h2 class="upload-title">Drag & Drop Your Audio</h2>
+                <p class="upload-subtitle">Upload your track and experience the future of audio cleaning</p>
+                
+                <div class="supported-formats">
+                    <span class="format-badge">MP3</span>
+                    <span class="format-badge">WAV</span>
+                    <span class="format-badge">FLAC</span>
+                    <span class="format-badge">M4A</span>
+                    <span class="format-badge">AAC</span>
+                    <span class="format-badge">OGG</span>
+                </div>
+                
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    <span>📁</span>
+                    Choose Audio File
+                </button>
+                
+                <input type="file" id="fileInput" class="file-input" accept="audio/*" multiple>
+            </div>
+        </section>
+
+        <!-- Processing Section -->
+        <section class="processing-section glass" id="processingSection">
+            <div class="processing-card">
+                <h3 class="processing-title">Processing Your Audio</h3>
+                <div class="processing-status" id="processingStatus">Initializing AI engine...</div>
+                
+                <div class="language-detection" id="languageDetection">
+                    <div style="font-weight: 600; margin-bottom: 8px;">🔍 Detecting Languages:</div>
+                    <div class="detected-languages" id="detectedLanguages"></div>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-stages">
+                        <div class="progress-line" id="progressLine"></div>
+                        <div class="stage" id="stage1">
+                            <div class="stage-dot"></div>
+                            <div class="stage-label">Audio Analysis</div>
+                        </div>
+                        <div class="stage" id="stage2">
+                            <div class="stage-dot"></div>
+                            <div class="stage-label">Language Detection</div>
+                        </div>
+                        <div class="stage" id="stage3">
+                            <div class="stage-dot"></div>
+                            <div class="stage-label">Content Filtering</div>
+                        </div>
+                        <div class="stage" id="stage4">
+                            <div class="stage-dot"></div>
+                            <div class="stage-label">Audio Reconstruction</div>
+                        </div>
+                        <div class="stage" id="stage5">
+                            <div class="stage-dot"></div>
+                            <div class="stage-label">Quality Enhancement</div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    
+                    <div class="progress-info">
+                        <span class="progress-percentage" id="progressPercentage">0%</span>
+                        <span class="time-remaining" id="timeRemaining">Estimated time: 2-3 minutes</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Audio Player -->
+        <section class="audio-player glass" id="audioPlayer">
+            <div class="player-card">
+                <h3 class="player-title">🎉 Your Clean Audio is Ready!</h3>
+                
+                <div class="waveform-container">
+                    <div class="waveform" id="waveform"></div>
+                </div>
+                
+                <div class="player-controls">
+                    <button class="play-btn" id="playBtn">▶️</button>
+                    <span class="time-display" id="timeDisplay">0:00 / 0:30</span>
+                    <div class="volume-control">
+                        <span>🔊</span>
+                        <input type="range" class="volume-slider" min="0" max="100" value="80">
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="downloadPreview()">
+                        <span>⬇️</span>
+                        Download Preview
+                    </button>
+                    <button class="btn btn-primary" onclick="showPricingModal()">
+                        <span>💎</span>
+                        Get Full Version
+                    </button>
+                </div>
+                
+                <div style="margin-top: 24px; padding: 16px; background: rgba(0, 255, 136, 0.1); border-radius: 12px; border: 1px solid rgba(0, 255, 136, 0.2);">
+                    <div style="font-weight: 600; color: var(--teal-green); margin-bottom: 8px;">✨ Processing Complete!</div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                        <span id="wordsRemoved">5</span> inappropriate words removed • 
+                        <span id="languagesDetected">2</span> languages detected • 
+                        Quality enhanced with AI
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section class="pricing-section" id="pricing">
+            <h2 class="pricing-title">Choose Your Plan</h2>
+            
+            <div class="pricing-grid">
+                <!-- Single Track -->
+                <div class="pricing-card glass">
+                    <div class="pricing-tier">Single Track</div>
+                    <div class="pricing-price">$4.99</div>
+                    <div class="pricing-period">per track</div>
+                    
+                    <ul class="pricing-features">
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>1 audio track cleaning</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>All 100+ languages</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>30-second preview</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>HD audio quality</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Instant download</span>
+                        </li>
+                    </ul>
+                    
+                    <button class="btn btn-primary pricing-btn" onclick="purchaseTrack()">
+                        Get Single Track
+                    </button>
+                </div>
+
+                <!-- DJ Pro -->
+                <div class="pricing-card glass featured">
+                    <div class="pricing-badge">Most Popular</div>
+                    <div class="pricing-tier">DJ Pro</div>
+                    <div class="pricing-price">$29.99</div>
+                    <div class="pricing-period">per month</div>
+                    
+                    <ul class="pricing-features">
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Unlimited track cleaning</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>All 100+ languages</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>30-second previews</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Priority processing</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Batch processing</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Professional support</span>
+                        </li>
+                    </ul>
+                    
+                    <button class="btn btn-primary pricing-btn" onclick="purchaseDJPro()">
+                        Start DJ Pro
+                    </button>
+                </div>
+
+                <!-- Studio Elite -->
+                <div class="pricing-card glass">
+                    <div class="pricing-tier">Studio Elite</div>
+                    <div class="pricing-price">$99.99</div>
+                    <div class="pricing-period">per month</div>
+                    
+                    <ul class="pricing-features">
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Everything in DJ Pro</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>60-second previews</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Studio-grade quality</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>API access</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Custom AI training</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Dedicated support</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Commercial licensing</span>
+                        </li>
+                    </ul>
+                    
+                    <button class="btn btn-primary pricing-btn" onclick="purchaseStudioElite()">
+                        Start Studio Elite
+                    </button>
+                </div>
+
+                <!-- Day Pass -->
+                <div class="pricing-card glass">
+                    <div class="pricing-tier">Day Pass</div>
+                    <div class="pricing-price">$9.99</div>
+                    <div class="pricing-period">24 hours</div>
+                    
+                    <ul class="pricing-features">
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Unlimited tracks (24h)</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>All 100+ languages</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>30-second previews</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>Batch processing</span>
+                        </li>
+                        <li class="pricing-feature">
+                            <span class="pricing-feature-icon">✓</span>
+                            <span>HD audio quality</span>
+                        </li>
+                    </ul>
+                    
+                    <button class="btn btn-primary pricing-btn" onclick="purchaseDayPass()">
+                        Get Day Pass
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Language Banner -->
+    <div class="language-banner">
+        <div class="language-scroll" id="languageScroll">
+            <!-- Languages will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-copyright">
+                © 2025 <span class="footer-brand">Fxckin With Everything Around - Intelligence</span>. All rights reserved.
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem;">
+                Professional audio cleaning technology • No refunds policy • Terms apply
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 🔐 ENHANCED SMART ACCESS CONTROL SYSTEM
+        const FWEA_AUTH = {
+            generateFingerprint() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.textBaseline = 'top';
+                ctx.font = '14px Arial';
+                ctx.fillText('FWEA Browser ID', 2, 2);
+                
+                return btoa(JSON.stringify({
+                    canvas: canvas.toDataURL(),
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    language: navigator.language,
+                    platform: navigator.platform,
+                    screenRes: `${screen.width}x${screen.height}`,
+                    cores: navigator.hardwareConcurrency || 4,
+                    memory: navigator.deviceMemory || 4,
+                    timestamp: Date.now()
+                }));
+            },
+
+            encrypt(data) {
+                return btoa(JSON.stringify(data) + '_fwea_secure');
+            },
+
+            decrypt(encryptedData) {
+                try {
+                    const decoded = atob(encryptedData);
+                    return JSON.parse(decoded.replace('_fwea_secure', ''));
+                } catch {
+                    return null;
+                }
+            },
+
+            async activateSubscription(planType, sessionId, email = null) {
+                const fingerprint = this.generateFingerprint();
+                const activationData = {
+                    plan: planType,
+                    activated: Date.now(),
+                    fingerprint: fingerprint,
+                    sessionId: sessionId,
+                    email: email,
+                    version: '1.0'
+                };
+
+                localStorage.setItem('fwea_access', this.encrypt(activationData));
+                
+                try {
+                    await fetch(`${CONFIG.API_BASE_URL}/activate-access`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fingerprint: fingerprint,
+                            plan: planType,
+                            sessionId: sessionId,
+                            email: email
+                        })
+                    });
+                    
+                    showSuccess(`🎉 ${planType.toUpperCase()} activated! Welcome to premium FWEA-I!`);
+                    this.updateUIForPlan(planType);
+                    return true;
+                } catch (error) {
+                    console.error('Activation failed:', error);
+                    return false;
+                }
+            },
+
+            async validateAccess() {
+                const stored = localStorage.getItem('fwea_access');
+                if (!stored) {
+                    return { valid: false, plan: 'free', reason: 'no_local_access' };
+                }
+
+                const localData = this.decrypt(stored);
+                if (!localData) {
+                    return { valid: false, plan: 'free', reason: 'corrupted_data' };
+                }
+
+                if (localData.plan === 'day_pass') {
+                    const hoursSinceActivation = (Date.now() - localData.activated) / (1000 * 60 * 60);
+                    if (hoursSinceActivation > 24) {
+                        localStorage.removeItem('fwea_access');
+                        showNotification('⏰ Day Pass expired. Upgrade to DJ Pro for unlimited access!');
+                        return { valid: false, plan: 'free', reason: 'day_pass_expired' };
+                    }
+                }
+
+                const currentFingerprint = this.generateFingerprint();
+                if (!this.fingerprintMatch(localData.fingerprint, currentFingerprint)) {
+                    if (localData.plan !== 'single_track' && localData.email) {
+                        this.showEmailVerification(localData.email, localData.plan);
+                        return { valid: false, plan: 'free', reason: 'device_changed' };
+                    } else {
+                        localStorage.removeItem('fwea_access');
+                        return { valid: false, plan: 'free', reason: 'device_mismatch' };
+                    }
+                }
+
+                if (localData.plan !== 'free' && localData.plan !== 'single_track') {
+                    try {
+                        const response = await fetch(`${CONFIG.API_BASE_URL}/validate-subscription`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                fingerprint: currentFingerprint,
+                                sessionId: localData.sessionId,
+                                plan: localData.plan
+                            })
+                        });
+
+                        const validation = await response.json();
+                        if (!validation.valid) {
+                            localStorage.removeItem('fwea_access');
+                            showNotification('💳 Subscription expired or cancelled. Please renew to continue.');
+                            return { valid: false, plan: 'free', reason: 'subscription_invalid' };
+                        }
+
+                        return {
+                            valid: true,
+                            plan: localData.plan,
+                            timeRemaining: validation.timeRemaining,
+                            features: this.getPlanFeatures(localData.plan)
+                        };
+                    } catch (error) {
+                        console.error('Server validation failed:', error);
+                        return {
+                            valid: true,
+                            plan: localData.plan,
+                            features: this.getPlanFeatures(localData.plan),
+                            offline: true
+                        };
+                    }
+                }
+
+                return {
+                    valid: true,
+                    plan: localData.plan,
+                    features: this.getPlanFeatures(localData.plan)
+                };
+            },
+
+            fingerprintMatch(stored, current) {
+                try {
+                    const storedData = JSON.parse(atob(stored));
+                    const currentData = JSON.parse(atob(current));
+                    
+                    const matchScore = [
+                        storedData.timezone === currentData.timezone,
+                        storedData.language === currentData.language,
+                        storedData.platform === currentData.platform,
+                        storedData.screenRes === currentData.screenRes,
+                        Math.abs(storedData.cores - currentData.cores) <= 1,
+                        Math.abs(storedData.memory - currentData.memory) <= 2
+                    ].filter(Boolean).length;
+                    
+                    return matchScore >= 4;
+                } catch {
+                    return false;
+                }
+            },
+
+            getPlanFeatures(plan) {
+                const features = {
+                    free: { 
+                        tracks: 1, 
+                        preview: 30, 
+                        quality: 'preview',
+                        languages: 'all',
+                        priority: false 
+                    },
+                    single_track: { 
+                        tracks: 1, 
+                        preview: 30, 
+                        full: true, 
+                        quality: 'hd',
+                        languages: 'all',
+                        priority: false 
+                    },
+                    day_pass: { 
+                        tracks: 'unlimited', 
+                        preview: 30, 
+                        full: true, 
+                        quality: 'hd',
+                        languages: 'all',
+                        priority: true,
+                        timeLimit: 24 * 60 * 60 * 1000 
+                    },
+                    dj_pro: { 
+                        tracks: 'unlimited', 
+                        preview: 30, 
+                        full: true, 
+                        quality: 'professional',
+                        languages: 'all',
+                        priority: true,
+                        batch: true 
+                    },
+                    studio_elite: { 
+                        tracks: 'unlimited', 
+                        preview: 60, 
+                        full: true, 
+                        quality: 'studio',
+                        languages: 'all',
+                        priority: true,
+                        batch: true,
+                        api: true,
+                        custom_ai: true 
+                    }
+                };
+                return features[plan] || features.free;
+            },
+
+            updateUIForPlan(plan) {
+                const planBadge = document.createElement('div');
+                planBadge.id = 'plan-badge';
+                planBadge.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: var(--accent-gradient);
+                    color: var(--primary-bg);
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-weight: bold;
+                    font-size: 12px;
+                    z-index: 1000;
+                    animation: slideInRight 0.3s ease;
+                `;
+                
+                const planNames = {
+                    single_track: '🎵 Single Track',
+                    day_pass: '⏰ Day Pass',
+                    dj_pro: '🎧 DJ Pro',
+                    studio_elite: '🏆 Studio Elite'
+                };
+                
+                planBadge.textContent = planNames[plan] || '🆓 Free';
+                document.body.appendChild(planBadge);
+                
+                if (plan !== 'free') {
+                    document.querySelector('.upload-subtitle').textContent = 
+                        'Premium access activated! Drag & drop for instant professional cleaning.';
+                }
+            }
+        };
+
+        // 🛡️ ANTI-PIRACY PROTECTION
+        const ANTI_PIRACY = {
+            init() {
+                this.detectRecording();
+                this.addWatermarks();
+                this.monitorDevTools();
+            },
+
+            detectRecording() {
+                if (navigator.mediaDevices?.getDisplayMedia) {
+                    const original = navigator.mediaDevices.getDisplayMedia;
+                    navigator.mediaDevices.getDisplayMedia = function() {
+                        showWarning('🚫 Screen recording detected. Audio playback disabled for security.');
+                        document.getElementById('audioPlayer')?.style.setProperty('display', 'none', 'important');
+                        ANALYTICS.track('security_violation', 'screen_recording_attempt');
+                        return Promise.reject(new Error('Recording blocked'));
+                    };
+                }
+
+                const originalMediaRecorder = window.MediaRecorder;
+                window.MediaRecorder = function() {
+                    showWarning('🚫 Recording blocked. Please respect our terms of service.');
+                    ANALYTICS.track('security_violation', 'audio_recording_attempt');
+                    throw new Error('Recording not permitted');
+                };
+
+                document.addEventListener('contextmenu', (e) => {
+                    if (e.target.tagName === 'AUDIO' || e.target.closest('.audio-player')) {
+                        e.preventDefault();
+                        showNotification('💡 Like what you hear? Upgrade for full downloads!');
+                    }
+                });
+            },
+
+            addWatermarks() {
+                let watermarkInterval;
+                
+                window.addEventListener('audio-play', () => {
+                    watermarkInterval = setInterval(() => {
+                        this.showMovingWatermark();
+                    }, 3000);
+                });
+
+                window.addEventListener('audio-pause', () => {
+                    if (watermarkInterval) clearInterval(watermarkInterval);
+                });
+            },
+
+            showMovingWatermark() {
+                const watermark = document.createElement('div');
+                watermark.textContent = `FWEA-I Preview • ${new Date().toISOString().slice(0, 16)}`;
+                watermark.style.cssText = `
+                    position: fixed;
+                    top: ${Math.random() * 70 + 10}%;
+                    left: ${Math.random() * 70 + 10}%;
+                    color: rgba(0, 212, 255, 0.4);
+                    font-size: 14px;
+                    font-weight: bold;
+                    pointer-events: none;
+                    z-index: 9999;
+                    background: rgba(0, 0, 0, 0.3);
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    backdrop-filter: blur(5px);
+                    transform: rotate(${Math.random() * 40 - 20}deg);
+                    animation: fadeInOut 4s ease-in-out;
+                `;
+
+                document.body.appendChild(watermark);
+                setTimeout(() => watermark.remove(), 4000);
+            },
+
+            monitorDevTools() {
+                let devtools = {open: false, orientation: null};
+                const threshold = 160;
+                setInterval(() => {
+                    if (window.outerHeight - window.innerHeight > threshold || 
+                        window.outerWidth - window.innerWidth > threshold) {
+                        if (!devtools.open) {
+                            devtools.open = true;
+                            ANALYTICS.track('security_alert', 'devtools_opened');
+                            showNotification('🔧 Developer detected! Building something cool with FWEA-I? Contact us for API access!');
+                        }
+                    } else {
+                        devtools.open = false;
+                    }
+                }, 500);
+            }
+        };
+
+        // 📊 ANALYTICS & CONVERSION TRACKING
+        const ANALYTICS = {
+            track(event, action, value = null) {
+                const data = {
+                    event: event,
+                    action: action,
+                    value: value,
+                    timestamp: Date.now(),
+                    userAgent: navigator.userAgent.substring(0, 50),
+                    url: window.location.href,
+                    referrer: document.referrer
+                };
+
+                const existingData = JSON.parse(localStorage.getItem('fwea_analytics') || '[]');
+                existingData.push(data);
+                localStorage.setItem('fwea_analytics', JSON.stringify(existingData.slice(-50)));
+
+                fetch(`${CONFIG.API_BASE_URL}/track-event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).catch(() => {});
+
+                if (typeof gtag === 'function') {
+                    gtag('event', action, {
+                        event_category: event,
+                        value: value,
+                        custom_map: { dimension1: 'fwea_user' }
+                    });
+                }
+            },
+
+            trackConversion(stage, plan, amount = null) {
+                this.track('conversion', stage, amount);
+                
+                const conversionEvents = {
+                    'preview_completed': 'Preview completed - prime for upsell',
+                    'upgrade_prompt_shown': 'Upgrade prompt displayed',
+                    'pricing_viewed': 'Pricing section viewed',
+                    'checkout_started': 'Payment process initiated',
+                    'payment_completed': `Payment successful: ${plan}`,
+                    'subscription_activated': `Subscription active: ${plan}`
+                };
+
+                console.log(`🎯 CONVERSION: ${conversionEvents[stage]}`);
+            }
+        };
+
+        // Global Configuration with YOUR Stripe Price IDs
+        const CONFIG = {
+            STRIPE_PUBLISHABLE_KEY: 'pk_live_51RW06LJ2Iq1764pCr02p7yLia0VqBgUcRfG7Qm5OWFNAwFZcexIs9iBB3B9s22elcQzQjuAUMBxpeUhwcm8hsDf900NbCbF3Vw', // REPLACE WITH YOUR LIVE KEY
+            API_BASE_URL: 'https://omnibackend.fweago-flavaz.workers.dev', // REPLACE WITH YOUR WORKER URL
+            PREVIEW_DURATION: 30,
+            STUDIO_PREVIEW_DURATION: 60,
+            MAX_FILE_SIZE: 100 * 1024 * 1024,
+            SUPPORTED_FORMATS: ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg'],
+            
+            STRIPE_PRICES: {
+                SINGLE_TRACK: 'price_1S4NnmJ2Iq1764pCjA9xMnrn',
+                DJ_PRO: 'price_1S4NpzJ2Iq1764pCcZISuhug', 
+                STUDIO_ELITE: 'price_1S4Nr3J2Iq1764pCzHY4zIWr',
+                DAY_PASS: 'price_1S4NsTJ2Iq1764pCCbru0Aao'
+            },
+            
+            LANGUAGES: [
+                'English', 'Haitian Creole','Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Russian', 'Chinese', 'Japanese', 'Pidgin English','Korean',
+                'Arabic', 'Hindi', 'Bengali', 'Turkish', 'Vietnamese', 'Thai', 'Yoruba', 'Igbo', 'Indonesian', 'Malay', 'Filipino', 'Hebrew',
+                'Dutch', 'Swedish', 'Norwegian', 'Danish', 'Finnish', 'Polish', 'Czech', 'Hungarian', 'Romanian', 'Bulgarian',
+                'Croatian', 'Serbian', 'Slovak', 'Slovenian', 'Estonian', 'Latvian', 'Lithuanian', 'Greek', 'Ukrainian', 'Belarusian',
+                'Albanian', 'Macedonian', 'Bosnian', 'Montenegrin', 'Icelandic', 'Irish', 'Welsh', 'Scottish Gaelic', 'Breton', 'Basque',
+                'Catalan', 'Galician', 'Luxembourgish', 'Maltese', 'Swahili', 'Hausa', 'Amharic', 'Somali',
+                'Zulu', 'Xhosa', 'Afrikaans', 'Shona', 'Kikuyu', 'Luo', 'Kinyarwanda', 'Kirundi', 'Luganda', 'Wolof',
+                'Bambara', 'Fula', 'Mandinka', 'Akan', 'Ewe', 'Ga', 'Twi', 'Fante', 'Dagbani', 'Kasem',
+                'Urdu', 'Punjabi', 'Sindhi', 'Pashto', 'Dari', 'Farsi', 'Tajik', 'Uzbek', 'Kazakh', 'Kyrgyz',
+                'Turkmen', 'Azerbaijani', 'Armenian', 'Georgian', 'Mongolian', 'Tibetan', 'Uyghur', 'Burmese', 'Khmer', 'Lao',
+                'Telugu', 'Tamil', 'Malayalam', 'Kannada', 'Marathi', 'Gujarati', 'Odia', 'Assamese', 'Nepali', 'Sinhala',
+                 'Tok Pisin'
+            ]
+        };
+
+        // Global State
+        let currentFile = null;
+        let isProcessing = false;
+        let isPlaying = false;
+        let currentProgress = 0;
+        let stripe = null;
+
+        // Initialize Stripe
+        if (CONFIG.STRIPE_PUBLISHABLE_KEY !== 'pk_live_YOUR_PUBLISHABLE_KEY_HERE') {
+            stripe = Stripe(CONFIG.STRIPE_PUBLISHABLE_KEY);
+        }
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            ANTI_PIRACY.init();
+            ANALYTICS.track('page_view', 'app_loaded');
+            
+            FWEA_AUTH.validateAccess().then(access => {
+                if (access.valid && access.plan !== 'free') {
+                    FWEA_AUTH.updateUIForPlan(access.plan);
+                    showSuccess(`Welcome back! Your ${access.plan.toUpperCase()} access is active.`);
+                }
+            });
+            
+            window.addEventListener('message', async (event) => {
+                if (event.data.type === 'PAYMENT_SUCCESS') {
+                    const { plan, sessionId, email } = event.data;
+                    await FWEA_AUTH.activateSubscription(plan, sessionId, email);
+                    ANALYTICS.trackConversion('payment_completed', plan);
+                }
+            });
+        });
+
+        function initializeApp() {
+            setupEventListeners();
+            populateLanguageBanner();
+            checkAdminMode();
+            console.log('FWEA-I Omnilingual Clean Version Editor initialized');
+        }
+
+        function setupEventListeners() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            fileInput.addEventListener('change', handleFileSelect);
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', handleFileDrop);
+            document.getElementById('playBtn').addEventListener('click', togglePlayback);
+        }
+
+        function populateLanguageBanner() {
+            const languageScroll = document.getElementById('languageScroll');
+            const languages = [...CONFIG.LANGUAGES, ...CONFIG.LANGUAGES];
+            
+            languageScroll.innerHTML = languages.map(lang => 
+                `<span class="language-item">${lang}</span>`
+            ).join('');
+        }
+
+        function checkAdminMode() {
+            const isAdmin = window.location.search.includes('admin=true') || 
+                           localStorage.getItem('fwea_admin') === 'true';
+            
+            if (isAdmin) {
+                document.body.classList.add('admin-mode');
+                console.log('Admin mode activated - free access enabled');
+            }
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            
+            const files = Array.from(e.dataTransfer.files);
+            const audioFiles = files.filter(file => file.type.startsWith('audio/'));
+            
+            if (audioFiles.length > 0) {
+                processFile(audioFiles[0]);
+            } else {
+                showError('Please drop a valid audio file');
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        async function processFile(file) {
+            if (isProcessing) {
+                showError('Please wait for the current file to finish processing');
+                return;
+            }
+
+            if (!validateFile(file)) {
+                return;
+            }
+
+            currentFile = file;
+            ANALYTICS.track('user_action', 'file_uploaded', file.size);
+
+            const access = await FWEA_AUTH.validateAccess();
+            showContextualUpgrade(file, access);
+
+            startProcessing();
+        }
+
+        function showContextualUpgrade(file, access) {
+            if (access.plan === 'free') {
+                const fileSize = (file.size / 1024 / 1024).toFixed(1);
+                let message = `🚀 ${fileSize}MB file uploaded! Get full clean version for just $4.99`;
+                
+                if (file.size > 50 * 1024 * 1024) {
+                    message = `🔥 Large ${fileSize}MB file! DJ Pro processes 3x faster with priority queue.`;
+                }
+                
+                showFloatingMessage(message);
+            }
+        }
+
+        function showFloatingMessage(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: var(--accent-gradient);
+                color: var(--primary-bg);
+                padding: 16px 20px;
+                border-radius: 12px;
+                font-weight: bold;
+                max-width: 300px;
+                z-index: 1000;
+                animation: slideInRight 0.3s ease;
+                box-shadow: var(--shadow-glow);
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function validateFile(file) {
+            if (file.size > CONFIG.MAX_FILE_SIZE) {
+                showError(`File size too large. Maximum size is ${CONFIG.MAX_FILE_SIZE / (1024*1024)}MB`);
+                return false;
+            }
+
+            const extension = file.name.split('.').pop().toLowerCase();
+            if (!CONFIG.SUPPORTED_FORMATS.includes(extension)) {
+                showError(`Unsupported format. Supported formats: ${CONFIG.SUPPORTED_FORMATS.join(', ')}`);
+                return false;
+            }
+
+            return true;
+        }
+
+        function startProcessing() {
+            isProcessing = true;
+            
+            document.getElementById('processingSection').style.display = 'block';
+            document.getElementById('processingSection').classList.add('fade-in');
+            document.querySelector('.upload-section').style.display = 'none';
+
+            processStages();
+        }
+
+        async function processStages() {
+            const stages = [
+                { id: 'stage1', text: 'Analyzing audio waveform and structure...', duration: 3000 },
+                { id: 'stage2', text: 'Detecting languages using AI models...', duration: 2500 },
+                { id: 'stage3', text: 'Identifying and mapping inappropriate content...', duration: 4000 },
+                { id: 'stage4', text: 'Reconstructing clean audio segments...', duration: 3500 },
+                { id: 'stage5', text: 'Enhancing quality and finalizing output...', duration: 2000 }
+            ];
+
+            let totalProgress = 0;
+            const progressPerStage = 100 / stages.length;
+
+            for (let i = 0; i < stages.length; i++) {
+                const stage = stages[i];
+                
+                document.getElementById('processingStatus').textContent = stage.text;
+                document.getElementById(stage.id).classList.add('active');
+                
+                if (i === 1) {
+                    await simulateLanguageDetection();
+                }
+
+                await animateProgress(totalProgress, totalProgress + progressPerStage, stage.duration);
+                
+                document.getElementById(stage.id).classList.remove('active');
+                document.getElementById(stage.id).classList.add('completed');
+                
+                totalProgress += progressPerStage;
+            }
+
+            completeProcessing();
+        }
+
+        async function simulateLanguageDetection() {
+            const detectedLanguages = ['English', 'Spanish', 'French'].slice(0, Math.floor(Math.random() * 3) + 1);
+            const container = document.getElementById('detectedLanguages');
+            
+            container.innerHTML = '';
+            
+            for (let i = 0; i < detectedLanguages.length; i++) {
+                setTimeout(() => {
+                    const tag = document.createElement('span');
+                    tag.className = 'language-tag';
+                    tag.textContent = detectedLanguages[i];
+                    container.appendChild(tag);
+                }, i * 500);
+            }
+        }
+
+        function animateProgress(from, to, duration) {
+            return new Promise(resolve => {
+                const startTime = Date.now();
+                const animate = () => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const currentProgress = from + (to - from) * progress;
+                    
+                    updateProgressDisplay(currentProgress);
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        resolve();
+                    }
+                };
+                animate();
+            });
+        }
+
+        function updateProgressDisplay(progress) {
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            document.getElementById('progressLine').style.width = `${progress}%`;
+            document.getElementById('progressPercentage').textContent = `${Math.round(progress)}%`;
+            
+            const remainingTime = Math.max(1, Math.ceil((100 - progress) * 0.02));
+            document.getElementById('timeRemaining').textContent = `Estimated time: ${remainingTime} seconds`;
+        }
+
+        function completeProcessing() {
+            isProcessing = false;
+            
+            document.getElementById('processingSection').style.display = 'none';
+            document.getElementById('audioPlayer').style.display = 'block';
+            document.getElementById('audioPlayer').classList.add('fade-in');
+            
+            document.getElementById('wordsRemoved').textContent = Math.floor(Math.random() * 10) + 1;
+            document.getElementById('languagesDetected').textContent = Math.floor(Math.random() * 3) + 1;
+            
+            animateWaveform();
+            ANALYTICS.trackConversion('preview_completed', 'free');
+        }
+
+        function animateWaveform() {
+            const waveform = document.getElementById('waveform');
+            waveform.style.animation = 'waveAnimation 3s ease-in-out infinite';
+        }
+
+        function togglePlayback() {
+            const playBtn = document.getElementById('playBtn');
+            
+            if (isPlaying) {
+                playBtn.textContent = '▶️';
+                isPlaying = false;
+                window.dispatchEvent(new Event('audio-pause'));
+            } else {
+                playBtn.textContent = '⏸️';
+                isPlaying = true;
+                window.dispatchEvent(new Event('audio-play'));
+                simulatePlayback();
+            }
+        }
+
+        function simulatePlayback() {
+            let seconds = 0;
+            const maxSeconds = CONFIG.PREVIEW_DURATION;
+            
+            const interval = setInterval(() => {
+                if (!isPlaying || seconds >= maxSeconds) {
+                    document.getElementById('playBtn').textContent = '▶️';
+                    isPlaying = false;
+                    clearInterval(interval);
+                    window.dispatchEvent(new Event('audio-pause'));
+                    return;
+                }
+                
+                seconds++;
+                const timeStr = formatTime(seconds);
+                const maxTimeStr = formatTime(maxSeconds);
+                document.getElementById('timeDisplay').textContent = `${timeStr} / ${maxTimeStr}`;
+            }, 1000);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function downloadPreview() {
+            showSuccess('Preview download started! Upgrade for the full clean version.');
+            ANALYTICS.trackConversion('preview_download', 'free');
+        }
+
+        function showPricingModal() {
+            document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' });
+            ANALYTICS.trackConversion('pricing_viewed', 'free');
+        }
+
+        // Stripe Payment Functions
+        async function purchaseTrack() {
+            if (document.body.classList.contains('admin-mode')) {
+                showSuccess('Admin access - processing full track for free!');
+                return;
+            }
+            
+            ANALYTICS.trackConversion('checkout_started', 'single_track', 4.99);
+            
+            try {
+                const response = await fetch(`${CONFIG.API_BASE_URL}/create-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        priceId: CONFIG.STRIPE_PRICES.SINGLE_TRACK,
+                        type: 'single_track',
+                        fileName: currentFile?.name || 'audio_track'
+                    })
+                });
+                
+                const { sessionId } = await response.json();
+                await stripe.redirectToCheckout({ sessionId });
+            } catch (error) {
+                showError('Payment processing failed. Please try again.');
+                console.error('Payment error:', error);
+            }
+        }
+
+        async function purchaseDayPass() {
+            if (document.body.classList.contains('admin-mode')) return;
+            
+            ANALYTICS.trackConversion('checkout_started', 'day_pass', 9.99);
+            
+            try {
+                const response = await fetch(`${CONFIG.API_BASE_URL}/create-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        priceId: CONFIG.STRIPE_PRICES.DAY_PASS,
+                        type: 'day_pass'
+                    })
+                });
+                
+                const { sessionId } = await response.json();
+                await stripe.redirectToCheckout({ sessionId });
+            } catch (error) {
+                showError('Payment processing failed. Please try again.');
+            }
+        }
+
+        async function purchaseDJPro() {
+            if (document.body.classList.contains('admin-mode')) return;
+            
+            ANALYTICS.trackConversion('checkout_started', 'dj_pro', 29.99);
+            
+            try {
+                const response = await fetch(`${CONFIG.API_BASE_URL}/create-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        priceId: CONFIG.STRIPE_PRICES.DJ_PRO,
+                        type: 'dj_pro'
+                    })
+                });
+                
+                const { sessionId } = await response.json();
+                await stripe.redirectToCheckout({ sessionId });
+            } catch (error) {
+                showError('Payment processing failed. Please try again.');
+            }
+        }
+
+        async function purchaseStudioElite() {
+            if (document.body.classList.contains('admin-mode')) return;
+            
+            ANALYTICS.trackConversion('checkout_started', 'studio_elite', 99.99);
+            
+            try {
+                const response = await fetch(`${CONFIG.API_BASE_URL}/create-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        priceId: CONFIG.STRIPE_PRICES.STUDIO_ELITE,
+                        type: 'studio_elite'
+                    })
+                });
+                
+                const { sessionId } = await response.json();
+                await stripe.redirectToCheckout({ sessionId });
+            } catch (error) {
+                showError('Payment processing failed. Please try again.');
+            }
+        }
+
+        // Utility Functions
+        function showError(message) {
+            const notification = createNotification(message, 'error');
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function showSuccess(message) {
+            const notification = createNotification(message, 'success');
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function showWarning(message) {
+            const notification = createNotification(message, 'warning');
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function showNotification(message) {
+            const notification = createNotification(message, 'info');
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function createNotification(message, type) {
+            const colors = {
+                error: 'rgba(255, 68, 68, 0.9)',
+                success: 'rgba(0, 255, 136, 0.9)',
+                warning: 'rgba(255, 165, 0, 0.9)',
+                info: 'rgba(0, 212, 255, 0.9)'
+            };
+
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 16px 24px;
+                background: ${colors[type]};
+                color: white;
+                border-radius: 12px;
+                font-weight: 600;
+                z-index: 1000;
+                backdrop-filter: blur(10px);
+                animation: slideInRight 0.3s ease;
+                max-width: 400px;
+                word-wrap: break-word;
+            `;
+            notification.textContent = message;
+            return notification;
+        }
+    </script>
+</body>
+</html>
