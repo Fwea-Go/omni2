@@ -1,0 +1,62 @@
+# Ignore macOS system files
+.DS_Store
+
+# Ignore Windows thumbnail and system files
+Thumbs.db
+desktop.ini
+
+# Ignore Python bytecode and logs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Ignore virtual environment folders
+venv/
+ENV/
+
+# Ignore node modules and build folders
+node_modules/
+dist/
+build/
+
+# Ignore archives and personal documents
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+*.mp3
+*.wav
+
+# Ignore IDE/editor folders
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore shell history or temporary files
+*.bak
+*.tmp
+*.swp
+*.swo
+*.zsh_history
+*~
+
+# Ignore exported assets and backups
+exported-assets.zip
+exported-assets/
+
+# Track only project folders explicitly: (optional)
+!omni-backend/**
+!omni-frontend/**
+
+# If you want to be strict, ignore everything except index.html in frontend
+# Uncomment the lines below if you want this stricter approach:
+# *
+# !omni-frontend/
+# !omni-frontend/index.html
