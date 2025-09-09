@@ -1,5 +1,5 @@
 {
-  "name": "fwea-i-backend",
+  "name": "omni-backend",
   "version": "1.0.0",
   "description": "FWEA-I Omnilingual Clean Version Editor Backend",
   "main": "src/worker.js",
