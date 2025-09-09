@@ -49,7 +49,7 @@ export default {
   },
 };
 
-export class ProcessingState {
+export class ProcessingStateV2 {
   constructor(state, env) {
     this.state = state;
     this.env = env;
