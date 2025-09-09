@@ -51,9 +51,9 @@ binding = "ANALYTICS"
 dataset = "fwea_analytics"
 
 # Queue binding for background processing
-[queues]
-binding = "AUDIO_QUEUE"
-queue = "fwea-audio-processing"
+# [queues]
+# binding = "AUDIO_QUEUE"
+# queue = "fwea-audio-processing"
 
 
 # Durable Objects for real-time features
