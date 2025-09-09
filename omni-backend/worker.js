@@ -950,3 +950,5 @@ class Stripe {
     };
   }
 }
+
+export { ProcessingStateV2 };
