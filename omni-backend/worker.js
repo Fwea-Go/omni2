@@ -1,6 +1,5 @@
 // Cloudflare Worker for FWEA-I Backend
 // Complete production-ready worker with enhanced authentication and anti-piracy
-import Stripe from 'stripe';
 
 
 export default {
