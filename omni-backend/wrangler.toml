@@ -48,7 +48,7 @@ preview_id = "your-preview-kv-namespace-id-here"
 # Analytics Engine for usage tracking
 [[analytics_engine_datasets]]
 binding = "ANALYTICS"
-dataset = "fwea_analytics"
+dataset = "omni_analytics"
 
 # Queue binding for background processing
 # [queues]
