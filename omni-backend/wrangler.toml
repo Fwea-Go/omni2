@@ -72,9 +72,9 @@ new_sqlite_classes = [ "ProcessingStateV2" ]
 [build]
 command = ""
 
-# Resource limits
-[limits]
-cpu_ms = 50000
+# Resource limits (PAID)
+# [limits]
+# cpu_ms = 50000
 
 # Custom domains (uncomment and modify)
 # routes = [
