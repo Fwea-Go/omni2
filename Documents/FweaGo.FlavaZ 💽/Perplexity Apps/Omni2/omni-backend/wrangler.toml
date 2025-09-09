@@ -5,17 +5,16 @@ compatibility_flags = ["nodejs_compat"]
 
 # Development environment
 [env.development]
-vars = { 
+
   ENVIRONMENT = "development",
   FRONTEND_URL = "http://localhost:3000"
-}
 
 # Production environment  
 [env.production]
-vars = { 
+
   ENVIRONMENT = "production",
-  FRONTEND_URL = "https://4d5af075.omni2-8d2.pages.dev/"
-}
+  FRONTEND_URL = "https://omni2-8d2.pages.dev/"
+
 
 # Secrets (add these via wrangler secret put)
 # Required secrets to add manually:
