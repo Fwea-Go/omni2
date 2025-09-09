@@ -49,16 +49,7 @@ export default {
   },
 };
 
-export class ProcessingStateV2 {
-  constructor(state, env) {
-    this.state = state;
-    this.env = env;
-  }
-  // Example storage and fetch API
-  async fetch(request) {
-    return new Response('Durable Object V2 Active');
-  }
-}
+
 
 // YOUR STRIPE PRICE IDs CONFIGURATION
 const STRIPE_PRICE_IDS = {
@@ -951,4 +942,13 @@ class Stripe {
   }
 }
 
-export { ProcessingStateV2 };
+export class ProcessingStateV2 {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+  // Example storage and fetch API
+  async fetch(request) {
+    return new Response('Durable Object V2 Active');
+  }
+}
