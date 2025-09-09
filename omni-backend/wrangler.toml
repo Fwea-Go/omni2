@@ -62,11 +62,11 @@ name = "PROCESSING_STATE"
 class_name = "ProcessingState"
 
 
-
 [[migrations]]
-tag = "v2"
+tag = "v3"  # Bump this one higher than any previous tags
 new_classes = [ "ProcessingState" ]
 new_sqlite_classes = [ "ProcessingState" ]
+
 
 
 # Worker configuration
