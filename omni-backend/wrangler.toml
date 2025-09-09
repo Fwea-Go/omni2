@@ -6,13 +6,13 @@ compatibility_flags = ["nodejs_compat"]
 # Development environment
 [env.development]
 
-  ENVIRONMENT = "development",
+  ENVIRONMENT = "development"
   FRONTEND_URL = "http://localhost:3000"
 
 # Production environment  
 [env.production]
 
-  ENVIRONMENT = "production",
+  ENVIRONMENT = "production"
   FRONTEND_URL = "https://omni2-8d2.pages.dev/"
 
 
