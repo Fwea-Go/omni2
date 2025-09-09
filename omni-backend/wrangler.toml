@@ -58,13 +58,13 @@ dataset = "omni_analytics"
 
 # Durable Objects for real-time features
 [[durable_objects.bindings]]
-name = "PROCESSING_STATE"
-class_name = "ProcessingState"
-
+name = "PROCESSING_STATE_V2"
+class_name = "ProcessingStateV2"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = [ "ProcessingState" ]
+new_sqlite_classes = [ "ProcessingStateV2" ]
+
 
 
 
