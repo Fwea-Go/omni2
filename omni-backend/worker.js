@@ -153,9 +153,7 @@ export default {
       // Expose streaming/seek headers so <audio> can read them
       'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
       'Cross-Origin-Resource-Policy': 'cross-origin',
-      'Timing-Allow-Origin': '*',
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp'
+      'Timing-Allow-Origin': '*'
     };
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -359,8 +357,7 @@ async function handleAudioDownload(request, env, corsHeaders) {
   };
   headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges, Content-Length';
   headers['Content-Disposition'] = key.startsWith('previews/') ? 'inline; filename="preview.mp3"' : 'inline; filename="full.mp3"';
-  if (!mime.startsWith('audio/')) {
-    // Force audio content-type to help <audio> tags render
+  if (!mime || !mime.startsWith('audio/')) {
     headers['Content-Type'] = 'audio/mpeg';
   }
 
@@ -370,10 +367,14 @@ async function handleAudioDownload(request, env, corsHeaders) {
     const end = start + length - 1;
     headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
     headers['Content-Length'] = String(length);
+    // Ensure Accept-Ranges is always present
+    headers['Accept-Ranges'] = 'bytes';
     // Return with CORS + range headers so browsers can stream/seek audio across origins
     return new Response(r2Obj.body, { status: 206, headers });
   } else {
     headers['Content-Length'] = String(size);
+    // Ensure Accept-Ranges is always present
+    headers['Accept-Ranges'] = 'bytes';
     // Return with CORS + range headers so browsers can stream/seek audio across origins
     return new Response(r2Obj.body, { status: 200, headers });
   }
@@ -415,7 +416,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     const effectivePlan = admin ? 'studio_elite' : planType;
 
     if (!audioFile) {
-      return new Response(JSON.stringify({ error: 'No audio file provided' }), {
+      return new Response(JSON.stringify({ error: 'No audio file provided', hint: 'Send FormData with field name "audio".' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -742,7 +743,7 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
       metadata: {
         originalFileName: audioFile.name,
         fileSize: 0,
-        format: audioFile.type || 'application/octet-stream',
+        format: (audioFile.type && audioFile.type.startsWith('audio/')) ? audioFile.type : 'audio/mpeg',
         bitrate: getBitrateForPlan(planType),
         fingerprint
       }
@@ -888,7 +889,14 @@ function removeProfanityFromText(text, languages) {
 }
 
 async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mime = 'audio/mpeg', originalName = 'track', request = null, resolvedBase = null) {
-  mime = mime || 'audio/mpeg';
+  // Robust MIME guard: ensure a playable audio content-type
+  const extFromName = (String(originalName||'').split('.').pop()||'').toLowerCase();
+  const mimeByExt = {
+    mp3:'audio/mpeg', wav:'audio/wav', flac:'audio/flac', ogg:'audio/ogg', opus:'audio/opus', webm:'audio/webm', m4a:'audio/mp4', aac:'audio/aac'
+  };
+  if (!mime || typeof mime !== 'string' || !mime.startsWith('audio/')) {
+    mime = mimeByExt[extFromName] || 'audio/mpeg';
+  }
   const watermarkId = generateWatermarkId(fingerprint);
 
   // Absolute base URL for signed links (always https, no trailing slash)
@@ -902,6 +910,7 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   // Pick an extension that matches the incoming MIME (fallback to .bin)
   const extByMime = {
     'audio/mpeg': 'mp3',
+    'audio/mpeg3': 'mp3',
     'audio/mp3': 'mp3',
     'audio/wav': 'wav',
     'audio/x-wav': 'wav',
