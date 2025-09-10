@@ -148,7 +148,7 @@ export default {
       'Access-Control-Allow-Origin': allowOrigin,
       'Vary': 'Origin',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin',
       'Access-Control-Max-Age': '86400',
       // Expose streaming/seek headers so <audio> can read them
       'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length'
@@ -188,6 +188,9 @@ export default {
         case '/health':
           return new Response('FWEA-I Backend Healthy', { headers: corsHeaders });
         case '/debug-env': {
+          if (!isAdminRequest(request, env)) {
+            return new Response('Forbidden', { status: 403, headers: corsHeaders });
+          }
           const debug = {
             has_AUDIO_URL_SECRET: Boolean(env.AUDIO_URL_SECRET),
             FRONTEND_URL: env.FRONTEND_URL || null,
@@ -219,6 +222,21 @@ export default {
 /* =========================
    Helpers — signing & range
    ========================= */
+
+function isAdminRequest(request, env) {
+  try {
+    const hdr = (request.headers.get('X-FWEA-Admin') || '').trim();
+    const tok = (env.ADMIN_API_TOKEN || '').trim();
+    if (!hdr || !tok) return false;
+    const enc = new TextEncoder();
+    const a = enc.encode(hdr);
+    const b = enc.encode(tok);
+    if (crypto.timingSafeEqual) return crypto.timingSafeEqual(a, b);
+    if (a.length !== b.length) return false;
+    let out = 0; for (let i = 0; i < a.length; i++) out |= a[i] ^ b[i];
+    return out === 0;
+  } catch { return false; }
+}
 
 function getWorkerBase(env, request) {
   // Prefer explicit env var
@@ -380,6 +398,8 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     const audioFile = formData.get('audio');         // <-- matches frontend
     const fingerprint = formData.get('fingerprint') || 'anonymous';
     const planType = formData.get('planType') || 'free';
+    const admin = isAdminRequest(request, env);
+    const effectivePlan = admin ? 'studio_elite' : planType;
 
     if (!audioFile) {
       return new Response(JSON.stringify({ error: 'No audio file provided' }), {
@@ -388,7 +408,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     }
 
     // Access validation
-    const accessValidation = await validateUserAccess(fingerprint, planType, env);
+    const accessValidation = await validateUserAccess(fingerprint, planType, env, request);
     if (!accessValidation.valid) {
       return new Response(JSON.stringify({
         error: 'Access denied', reason: accessValidation.reason, upgradeRequired: true
@@ -403,15 +423,15 @@ async function handleAudioProcessing(request, env, corsHeaders) {
       dj_pro: 200 * 1024 * 1024,
       studio_elite: 500 * 1024 * 1024,
     };
-    const maxSize = maxSizes[planType] || maxSizes.free;
+    const maxSize = maxSizes[effectivePlan] || maxSizes.free;
     if (audioFile.size > maxSize) {
       return new Response(JSON.stringify({
-        error: 'File too large', maxSize, currentSize: audioFile.size, upgradeRequired: planType === 'free'
+        error: 'File too large', maxSize, currentSize: audioFile.size, upgradeRequired: effectivePlan === 'free'
       }), { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // AI processing
-    const processingResult = await processAudioWithAI(audioFile, planType, fingerprint, env, request, getWorkerBase(env, request));
+    const processingResult = await processAudioWithAI(audioFile, effectivePlan, fingerprint, env, request, getWorkerBase(env, request));
 
     // Persist & analytics
     await storeProcessingResult(fingerprint, processingResult, env, planType);
@@ -880,7 +900,8 @@ function getBitrateForPlan(plan) {
    Persistence helpers
    ========================= */
 
-async function validateUserAccess(fingerprint, planType, env) {
+async function validateUserAccess(fingerprint, planType, env, request) {
+  if (isAdminRequest(request, env)) return { valid: true, reason: 'admin' };
   if (planType === 'free') return { valid: true, reason: 'free_tier' };
   try {
     const result = await env.DB.prepare(`
