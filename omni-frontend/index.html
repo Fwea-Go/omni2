@@ -685,6 +685,20 @@ const CONFIG = {
 };
 
 ///////////////////////
+// Admin token helpers
+///////////////////////
+function getAdminToken(){
+  try { return sessionStorage.getItem('FWEA_ADMIN_TOKEN') || ''; } catch { return ''; }
+}
+function setAdminToken(tok){
+  try { if(typeof tok === 'string') sessionStorage.setItem('FWEA_ADMIN_TOKEN', tok.trim()); } catch {}
+}
+function getAdminHeaders(){
+  const tok = getAdminToken();
+  return tok ? { 'X-FWEA-Admin': tok } : {};
+}
+
+///////////////////////
 // Ensure preview URLs are safe and usable from the site context
 function normalizePreviewUrl(url){
   try{
@@ -988,7 +1002,11 @@ async function processFile(file){
     fd.append('fingerprint', fp);
     fd.append('planType', plan);
 
-    const res = await fetch(`${CONFIG.API_BASE_URL}/process-audio`, { method:'POST', body: fd });
+    const res = await fetch(`${CONFIG.API_BASE_URL}/process-audio`, {
+      method: 'POST',
+      headers: { ...getAdminHeaders() }, // don't set Content-Type when using FormData
+      body: fd
+    });
     const json = await res.json();
     if(!res.ok || !json.success) throw new Error(json?.error || 'Processing failed');
 
@@ -1166,7 +1184,15 @@ function notify(message, type){
 // Admin mode flag
 (function checkAdmin(){
   const isAdmin = location.search.includes('admin=true') || localStorage.getItem('fwea_admin')==='true';
-  if(isAdmin){ document.body.classList.add('admin-mode'); console.log('Admin mode active'); }
+  if(isAdmin){
+    document.body.classList.add('admin-mode');
+    console.log('Admin mode active');
+    // ask once per session for the admin API token and cache it in sessionStorage
+    if(!getAdminToken()){
+      const tok = prompt('Enter admin API token');
+      if(tok) setAdminToken(tok);
+    }
+  }
     const dbg = document.getElementById('admin-debug');
     if(dbg){
       dbg.style.display = 'block';
@@ -1176,7 +1202,7 @@ function notify(message, type){
         btn.onclick = async ()=>{
           out.textContent = 'Checking backend…';
           try{
-            const r = await fetch(`${CONFIG.API_BASE_URL}/debug-env`, { method:'GET' });
+            const r = await fetch(`${CONFIG.API_BASE_URL}/debug-env`, { method:'GET', headers: { ...getAdminHeaders() } });
             const j = await r.json();
             out.textContent = (r.ok ? 'OK • ' : 'ERR • ') + `R2:${j.has_R2?'✅':'❌'} DB:${j.has_DB?'✅':'❌'} AI:${j.has_AI?'✅':'❌'} KV:${j.has_PROFANITY_KV?'✅':'❌'} BASE:${j.workerBase||'—'}`;
           }catch(e){ out.textContent = 'Failed to reach backend.'; }
@@ -1194,6 +1220,8 @@ function notify(message, type){
       }
     }
   }catch{}
+  // Optional: log presence of admin header/token
+  console.log('Admin header present:', !!getAdminToken());
 })();
 
 // minimal global to satisfy any external callbacks
