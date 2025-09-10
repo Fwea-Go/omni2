@@ -11,8 +11,6 @@ ENVIRONMENT = "development"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # Default frontend (overridden below)
 FRONTEND_URL = "http://localhost:3000"
-# ADMIN_API_TOKEN is required for admin-only access to protected endpoints
-ADMIN_API_TOKEN = "changeme-admin-token"
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
@@ -22,7 +20,8 @@ id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 # ---- KV (Profanity Lists) ----
 [[kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "your-profanity-kv-id"
+# TODO: replace with your real KV id (wrangler kv namespace list)
+id = "PROFANITY_LISTS_KV_ID_REPLACE_ME"
 
 # ---- D1 Database ----
 [[d1_databases]]
@@ -67,13 +66,19 @@ ENVIRONMENT = "development"
 FRONTEND_URL = "http://localhost:3000"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 
+[env.development.kv_namespaces]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
+
+[env.development.kv_namespaces]
+binding = "PROFANITY_LISTS"
+id = "PROFANITY_LISTS_DEV_ID"
+
 # ========== PRODUCTION ==========
 [env.production.vars]
 ENVIRONMENT = "production"
 FRONTEND_URL = "https://fwea-i.com"   # live site origin (no trailing slash)
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# ADMIN_API_TOKEN is required for admin-only access to protected endpoints
-ADMIN_API_TOKEN = "changeme-admin-token"
 
 [env.production]
 # KV
@@ -83,7 +88,7 @@ id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
 [[env.production.kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "your-profanity-kv-id"
+id = "PROFANITY_LISTS_PROD_ID"
 
 # D1
 [[env.production.d1_databases]]
