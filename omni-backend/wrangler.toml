@@ -53,9 +53,6 @@ new_classes = ["ProcessingStateV2"]
 [build]
 command = ""   # keep empty when deploying with `npx wrangler deploy`
 
-# ---- Cron triggers (keep under account limit) ----
-[triggers]
-crons = ["0 2 * * *", "0 0 * * SUN"]
 
 [placement]
 mode = "smart"
