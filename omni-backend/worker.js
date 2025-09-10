@@ -813,18 +813,31 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
   }
 
   const previewDuration = planType === 'studio_elite' ? 60 : 30;
-  const audioResults = await generateAudioOutputs(
-    audioBuffer,
-    profanityResults,
-    planType,
-    previewDuration,
-    fingerprint,
-    env,
-    audioFile.type,
-    audioFile.name,
-    request,
-    resolvedBase
-  );
+  // Generate streaming URLs (R2). If this fails, do NOT 500 —
+  // fall back to a graceful result so the UI can show an error
+  // banner but keep the page flow alive.
+  let audioResults = {
+    previewUrl: null,
+    fullAudioUrl: null,
+    processedDuration: Math.max(0, Math.floor(audioBuffer.byteLength / 44100) - 2),
+    watermarkId: generateWatermarkId(fingerprint)
+  };
+  try {
+    audioResults = await generateAudioOutputs(
+      audioBuffer,
+      profanityResults,
+      planType,
+      previewDuration,
+      fingerprint,
+      env,
+      audioFile.type,
+      audioFile.name,
+      request,
+      resolvedBase
+    );
+  } catch (e) {
+    console.warn('generateAudioOutputs failed; continuing without preview/full URLs:', e?.message || e);
+  }
 
   return {
     processId: generateProcessId(),
@@ -931,10 +944,14 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   const guessedExt = extByMime[mime] || (String(originalName).split('.').pop() || 'bin');
   const previewKey = `previews/${generateProcessId()}_preview.${guessedExt}`;
 
-  await env.AUDIO_STORAGE.put(previewKey, watermarkedPreview, {
-    httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'public, max-age=3600' },
-    customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
-  });
+  try {
+    await env.AUDIO_STORAGE.put(previewKey, watermarkedPreview, {
+      httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'public, max-age=3600' },
+      customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
+    });
+  } catch (e) {
+    console.warn('R2 put preview failed:', e?.message || e);
+  }
 
   const { exp: pexp, sig: psig } = await signR2Key(previewKey, env, 15 * 60);
   const previewUrl = psig
@@ -948,10 +965,14 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
     const watermarkedFull = await addAudioWatermark(processedAudio, watermarkId);
 
     const fullKey = `full/${generateProcessId()}_full.${guessedExt}`;
-    await env.AUDIO_STORAGE.put(fullKey, watermarkedFull, {
-      httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'private, max-age=7200' },
-      customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
-    });
+    try {
+      await env.AUDIO_STORAGE.put(fullKey, watermarkedFull, {
+        httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'private, max-age=7200' },
+        customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
+      });
+    } catch (e) {
+      console.warn('R2 put full failed:', e?.message || e);
+    }
 
     const { exp: fexp, sig: fsig } = await signR2Key(fullKey, env, 60 * 60);
     fullAudioUrl = fsig
