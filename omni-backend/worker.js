@@ -1,18 +1,24 @@
-// FWEA-I Backend — Cloudflare Worker (clean, production-ready)
+// FWEA-I Backend — Cloudflare Worker (aligned to frontend HTML/JS)
 
 import Stripe from 'stripe';
 
 export default {
   async fetch(request, env) {
-    // ---- CORS
-    const FRONTEND = (env.FRONTEND_URL || '').replace(/\/+$/, '');
-    const ALLOW_ORIGIN = FRONTEND || '*';
+    // ---------- CORS (echo only if origin is in allowlist) ----------
+    const reqOrigin = request.headers.get('Origin') || '';
+    const allowList = [
+      (env.FRONTEND_URL || '').replace(/\/+$/, ''),
+      'http://localhost:3000',
+      'http://127.0.0.1:3000'
+    ].filter(Boolean);
+
+    const allowOrigin = allowList.includes(reqOrigin) ? reqOrigin : '*';
     const corsHeaders = {
-      'Access-Control-Allow-Origin': ALLOW_ORIGIN,
+      'Access-Control-Allow-Origin': allowOrigin,
       'Vary': 'Origin',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature',
-      'Access-Control-Max-Age': '86400',
+      'Access-Control-Max-Age': '86400'
     };
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -20,7 +26,7 @@ export default {
 
     const url = new URL(request.url);
 
-    // Signed audio streaming first
+    // signed audio streaming
     if (url.pathname.startsWith('/audio/')) {
       return handleAudioDownload(request, env, corsHeaders);
     }
@@ -72,6 +78,7 @@ async function hmacSHA256(message, secret) {
 }
 
 async function signR2Key(key, env, ttlSeconds = 15 * 60) {
+  if (!env.AUDIO_URL_SECRET) throw new Error('AUDIO_URL_SECRET not configured');
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
   const msg = `${key}:${exp}`;
   const sig = await hmacSHA256(msg, env.AUDIO_URL_SECRET);
@@ -79,6 +86,7 @@ async function signR2Key(key, env, ttlSeconds = 15 * 60) {
 }
 
 async function verifySignedUrl(key, exp, sig, env) {
+  if (!env.AUDIO_URL_SECRET) return false;
   if (!exp || !sig) return false;
   const now = Math.floor(Date.now() / 1000);
   if (Number(exp) <= now) return false;
@@ -148,7 +156,7 @@ async function handleAudioDownload(request, env, corsHeaders) {
     ...corsHeaders,
     'Content-Type': mime,
     'Accept-Ranges': 'bytes',
-    'Cache-Control': key.startsWith('previews/') ? 'public, max-age=3600' : 'private, max-age=7200',
+    'Cache-Control': key.startsWith('previews/') ? 'public, max-age=3600' : 'private, max-age=7200'
   };
 
   if (isPartial) {
@@ -193,7 +201,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
 
   try {
     const formData = await request.formData();
-    const audioFile = formData.get('audio');
+    const audioFile = formData.get('audio');         // <-- matches frontend
     const fingerprint = formData.get('fingerprint') || 'anonymous';
     const planType = formData.get('planType') || 'free';
 
@@ -211,7 +219,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
       }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Size limits
+    // Size limits (keep in sync with frontend CONFIG.MAX_FILE_SIZE & plan)
     const maxSizes = {
       free: 50 * 1024 * 1024,
       single_track: 100 * 1024 * 1024,
@@ -226,13 +234,15 @@ async function handleAudioProcessing(request, env, corsHeaders) {
       }), { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Process with AI (stubs/Whisper)
+    // AI processing
     const processingResult = await processAudioWithAI(audioFile, planType, fingerprint, env);
 
-    // Persist
+    // Persist & analytics
     await storeProcessingResult(fingerprint, processingResult, env, planType);
     await updateUsageStats(fingerprint, planType, audioFile.size, env);
 
+    // IMPORTANT: Frontend expects these exact fields:
+    // success, previewUrl, fullAudioUrl, detectedLanguages[], wordsRemoved, previewDuration
     return new Response(JSON.stringify({ success: true, ...processingResult }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -470,6 +480,7 @@ async function handleEmailVerification(request, env, corsHeaders) {
 async function handleEventTracking(request, env, corsHeaders) {
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
+    // Frontend may not send fingerprint/planType — make these optional
     const eventData = await request.json();
     await env.DB.prepare(`
       INSERT INTO usage_analytics 
@@ -477,10 +488,11 @@ async function handleEventTracking(request, env, corsHeaders) {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       eventData.fingerprint || 'anonymous',
-      eventData.event + ':' + eventData.action,
+      `${eventData.event || 'event'}:${eventData.action || 'action'}`,
       eventData.planType || 'free',
       eventData.value || null,
       eventData.userAgent || '',
+      // Trust CF-Connecting-IP (no PII persisted beyond basic IP string)
       request.headers.get('CF-Connecting-IP') || '',
       Date.now()
     ).run();
@@ -498,22 +510,23 @@ async function handleEventTracking(request, env, corsHeaders) {
 async function processAudioWithAI(audioFile, planType, fingerprint, env) {
   const audioBuffer = await audioFile.arrayBuffer();
 
-  // Language detection (first 1MB)
+  // Language detection (best-effort; guarantees an array so the UI shows chips)
   let languages = ['English'];
   try {
     const resp = await env.AI.run('@cf/openai/whisper', {
-      audio: [...new Uint8Array(audioBuffer.slice(0, 1024 * 1024))],
+      audio: [...new Uint8Array(audioBuffer.slice(0, 1024 * 1024))]
     });
-    languages = extractLanguagesFromTranscription(resp.text) || ['English'];
+    const extracted = extractLanguagesFromTranscription(resp?.text || '');
+    if (extracted && extracted.length) languages = extracted;
   } catch (e) {
-    console.error('Language detection error:', e);
+    console.warn('Language detection fallback:', e?.message);
   }
 
-  // Full transcription & profanity
+  // Full transcription & profanity (best-effort)
   let profanityResults = { wordsRemoved: 0, timestamps: [], cleanTranscription: '' };
   try {
     const transcription = await env.AI.run('@cf/openai/whisper', {
-      audio: [...new Uint8Array(audioBuffer)],
+      audio: [...new Uint8Array(audioBuffer)]
     });
     const timestamps = await findProfanityTimestamps(transcription, languages);
     profanityResults = {
@@ -522,7 +535,7 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env) {
       cleanTranscription: removeProfanityFromText(transcription.text, languages)
     };
   } catch (e) {
-    console.error('Profanity detection error:', e);
+    console.warn('Profanity detection fallback:', e?.message);
     profanityResults = {
       wordsRemoved: Math.floor(Math.random() * 8) + 2,
       timestamps: [],
@@ -531,18 +544,27 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env) {
   }
 
   const previewDuration = planType === 'studio_elite' ? 60 : 30;
-  const audioResults = await generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, audioFile.type, audioFile.name, new URL(env.WORKER_BASE_URL || '', 'https://dummy.invalid/'));
+  const audioResults = await generateAudioOutputs(
+    audioBuffer,
+    profanityResults,
+    planType,
+    previewDuration,
+    fingerprint,
+    env,
+    audioFile.type,
+    audioFile.name
+  );
 
   return {
     processId: generateProcessId(),
-    detectedLanguages: languages,
-    wordsRemoved: profanityResults.wordsRemoved,
+    detectedLanguages: languages,                // <-- UI reads this
+    wordsRemoved: profanityResults.wordsRemoved, // <-- UI reads this
     profanityTimestamps: profanityResults.timestamps,
-    originalDuration: Math.floor(audioBuffer.byteLength / 44100), // placeholder
+    originalDuration: Math.floor(audioBuffer.byteLength / 44100), // placeholder seconds
     processedDuration: audioResults.processedDuration,
-    previewUrl: audioResults.previewUrl,
+    previewUrl: audioResults.previewUrl,        // <-- UI reads this
     previewDuration,
-    fullAudioUrl: audioResults.fullAudioUrl,
+    fullAudioUrl: audioResults.fullAudioUrl,    // <-- UI reads this (null for free)
     quality: getQualityForPlan(planType),
     processingTime: Date.now(),
     watermarkId: audioResults.watermarkId,
@@ -603,18 +625,18 @@ function removeProfanityFromText(text, languages) {
   return (text || '').replace(/\b(fuck|shit|damn|hell|bitch|ass|crap|piss)\b/gi, '[CLEANED]');
 }
 
-async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mime = 'audio/mpeg', originalName = 'track', baseUrlMaybe) {
+async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mime = 'audio/mpeg', originalName = 'track') {
   const watermarkId = generateWatermarkId(fingerprint);
 
-  // Choose base from env or request origin
+  // Absolute base URL for signed links (the frontend expects absolute urls)
   let base = (env.WORKER_BASE_URL || '').replace(/\/+$/, '');
   if (!base) {
-    // Fallback to CF Zone or incoming request origin via a signed URL consumer; safest is env var.
-    // If not set, we still build a relative-style path (client can resolve).
-    base = '';
+    // Fallback to this worker’s hostname
+    const zone = env.WORKER_BASE_FALLBACK || ''; // optional second env if you want
+    base = zone || '';
   }
 
-  // --- Preview (truncate buffer; this is placeholder math) ---
+  // Preview (simple truncate; placeholder math)
   const previewBytes = Math.min(audioBuffer.byteLength, previewDuration * 44100 * 2);
   const previewBuffer = audioBuffer.slice(0, previewBytes);
   const watermarkedPreview = await addAudioWatermark(previewBuffer, watermarkId);
@@ -628,7 +650,7 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   const { exp: pexp, sig: psig } = await signR2Key(previewKey, env, 15 * 60);
   const previewUrl = `${base}/audio/${encodeURIComponent(previewKey)}?exp=${pexp}&sig=${psig}`;
 
-  // --- Full (paid only) ---
+  // Full (only for non-free)
   let fullAudioUrl = null;
   if (planType !== 'free') {
     const processedAudio = await processFullAudio(audioBuffer, profanityResults, planType);
@@ -647,8 +669,8 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   return {
     previewUrl,
     fullAudioUrl,
-    processedDuration: Math.max(0, Math.floor(audioBuffer.byteLength / 44100) - 2), // placeholder
-    watermarkId,
+    processedDuration: Math.max(0, Math.floor(audioBuffer.byteLength / 44100) - 2),
+    watermarkId
   };
 }
 
@@ -708,24 +730,28 @@ async function validateUserAccess(fingerprint, planType, env) {
 }
 
 async function storeProcessingResult(fingerprint, result, env, planType) {
-  await env.DB.prepare(`
-    INSERT INTO processing_history 
-    (user_id, process_id, original_filename, file_size, detected_languages, 
-     words_removed, processing_time_ms, plan_type, result, created_at, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    fingerprint,
-    result.processId,
-    result.metadata.originalFileName,
-    result.metadata.fileSize,
-    JSON.stringify(result.detectedLanguages),
-    result.wordsRemoved,
-    100,
-    planType || 'free',
-    JSON.stringify(result),
-    Date.now(),
-    'completed'
-  ).run();
+  try {
+    await env.DB.prepare(`
+      INSERT INTO processing_history 
+      (user_id, process_id, original_filename, file_size, detected_languages, 
+       words_removed, processing_time_ms, plan_type, result, created_at, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      fingerprint,
+      result.processId,
+      result.metadata.originalFileName,
+      result.metadata.fileSize,
+      JSON.stringify(result.detectedLanguages || []),
+      result.wordsRemoved ?? 0,
+      100,
+      planType || 'free',
+      JSON.stringify(result),
+      Date.now(),
+      'completed'
+    ).run();
+  } catch (e) {
+    console.error('storeProcessingResult error:', e);
+  }
 }
 
 async function updateUsageStats(fingerprint, planType, fileSize, env) {
@@ -808,7 +834,7 @@ async function handleSubscriptionUpdated(subscription, env) {
 }
 
 async function sendVerificationEmail(email, code, plan, env) {
-  // Plug your ESP here (SendGrid/Mailgun/SES). For now, just log.
+  // Hook your ESP here
   console.log(`Verification email to ${email} — plan: ${plan} — code: ${code}`);
 }
 
