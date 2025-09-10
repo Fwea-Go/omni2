@@ -2,6 +2,52 @@
 
 import Stripe from 'stripe';
 
+// --- Durable Object: ProcessingStateV2 ---
+export class ProcessingStateV2 {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.cache = new Map();
+  }
+
+  // Simple KV-style API via fetch:
+  //  - GET /?key=abc
+  //  - PUT / { key, value }
+  //  - DELETE /?key=abc
+  async fetch(request) {
+    const url = new URL(request.url);
+    const method = request.method.toUpperCase();
+
+    if (method === 'GET') {
+      const key = url.searchParams.get('key');
+      if (!key) return new Response('Missing key', { status: 400 });
+      if (this.cache.has(key)) return new Response(this.cache.get(key) ?? 'null');
+      const v = await this.state.storage.get(key);
+      if (v != null) this.cache.set(key, v);
+      return new Response(v ?? 'null');
+    }
+
+    if (method === 'PUT') {
+      const { key, value } = await request.json().catch(() => ({}));
+      if (!key) return new Response('Missing key', { status: 400 });
+      await this.state.storage.put(key, value);
+      this.cache.set(key, value);
+      return new Response('OK');
+    }
+
+    if (method === 'DELETE') {
+      const key = url.searchParams.get('key');
+      if (!key) return new Response('Missing key', { status: 400 });
+      await this.state.storage.delete(key);
+      this.cache.delete(key);
+      return new Response('OK');
+    }
+
+    return new Response('Method Not Allowed', { status: 405 });
+  }
+}
+
+// Move export default outside the class
 export default {
   async fetch(request, env) {
     // ---------- CORS (echo only if origin is in allowlist) ----------
