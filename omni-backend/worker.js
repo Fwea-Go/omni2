@@ -1,52 +1,58 @@
 // Cloudflare Worker for FWEA-I Backend
 // Complete production-ready worker with enhanced authentication and anti-piracy
 
+import Stripe from 'stripe';
+
 
 export default {
-  async fetch(request, env, ctx) {
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature',
-    };
+async fetch(request, env, ctx) {
+  const FRONTEND = (env.FRONTEND_URL || '').replace(/\/+$/, '');
+const ALLOW_ORIGIN = FRONTEND || '*';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': ALLOW_ORIGIN,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature',
+    'Access-Control-Max-Age': '86400', // cache preflight
+  };
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
-    const url = new URL(request.url);
-    
-    try {
-      switch (url.pathname) {
-        case '/process-audio':
-          return await handleAudioProcessing(request, env, corsHeaders);
-        case '/create-payment':
-          return await handlePaymentCreation(request, env, corsHeaders);
-        case '/webhook':
-          return await handleStripeWebhook(request, env, corsHeaders);
-        case '/activate-access':
-          return await handleAccessActivation(request, env, corsHeaders);
-        case '/validate-subscription':
-          return await handleSubscriptionValidation(request, env, corsHeaders);
-        case '/send-verification':
-          return await handleSendVerification(request, env, corsHeaders);
-        case '/verify-email-code':
-          return await handleEmailVerification(request, env, corsHeaders);
-        case '/track-event':
-          return await handleEventTracking(request, env, corsHeaders);
-        case '/health':
-          return new Response('FWEA-I Backend Healthy', { headers: corsHeaders });
-        default:
-          return new Response('Not Found', { status: 404, headers: corsHeaders });
-      }
-    } catch (error) {
-      console.error('Worker Error:', error);
-      return new Response(
-        JSON.stringify({ error: 'Internal Server Error', details: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+  const url = new URL(request.url);
+
+  try {
+    switch (url.pathname) {
+      case '/process-audio':
+        return await handleAudioProcessing(request, env, corsHeaders);
+      case '/create-payment':
+        return await handlePaymentCreation(request, env, corsHeaders);
+      case '/webhook':
+        return await handleStripeWebhook(request, env, corsHeaders);
+      case '/activate-access':
+        return await handleAccessActivation(request, env, corsHeaders);
+      case '/validate-subscription':
+        return await handleSubscriptionValidation(request, env, corsHeaders);
+      case '/send-verification':
+        return await handleSendVerification(request, env, corsHeaders);
+      case '/verify-email-code':
+        return await handleEmailVerification(request, env, corsHeaders);
+      case '/track-event':
+        return await handleEventTracking(request, env, corsHeaders);
+      case '/health':
+        return new Response('FWEA-I Backend Healthy', { headers: corsHeaders });
+      default:
+        return new Response('Not Found', { status: 404, headers: corsHeaders });
     }
-  },
+  } catch (error) {
+    console.error('Worker Error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal Server Error', details: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+},
 };
 
 
@@ -56,8 +62,17 @@ const STRIPE_PRICE_IDS = {
   SINGLE_TRACK: 'price_1S4NnmJ2Iq1764pCjA9xMnrn',
   DJ_PRO: 'price_1S4NpzJ2Iq1764pCcZISuhug',
   STUDIO_ELITE: 'price_1S4Nr3J2Iq1764pCzHY4zIWr',
-  DAY_PASS: 'price_1S4NsTJ2Iq1764pCCbru0Aao'
+  DAY_PASS: 'price_1S4NsTJ2Iq1764pCCbru0Aao',
 };
+
+const PRICE_BY_TYPE = {
+  single_track: STRIPE_PRICE_IDS.SINGLE_TRACK,
+  day_pass: STRIPE_PRICE_IDS.DAY_PASS,
+  dj_pro: STRIPE_PRICE_IDS.DJ_PRO,
+  studio_elite: STRIPE_PRICE_IDS.STUDIO_ELITE,
+};
+
+// Removed misplaced validation logic from global scope. These checks are already performed inside handlePaymentCreation.
 
 // Enhanced Audio Processing with Access Control
 async function handleAudioProcessing(request, env, corsHeaders) {
@@ -117,7 +132,8 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     const processingResult = await processAudioWithAI(audioFile, planType, fingerprint, env);
     
     // Store processing result and update usage
-    await storeProcessingResult(fingerprint, processingResult, env);
+    
+    await storeProcessingResult(fingerprint, processingResult, env, planType);
     await updateUsageStats(fingerprint, planType, audioFile.size, env);
 
     return new Response(
@@ -138,93 +154,120 @@ async function handleAudioProcessing(request, env, corsHeaders) {
 }
 
 // Enhanced Payment Creation with Security
-async function handlePaymentCreation(request, env, corsHeaders) {
-  if (request.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
-  }
+ async function handlePaymentCreation(request, env, corsHeaders) {
+   if (request.method !== 'POST') {
+     return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+   }
 
-  try {
-    const { priceId, type, fileName, email, fingerprint } = await request.json();
-    
-    // Validate price ID
-    const validPriceIds = Object.values(STRIPE_PRICE_IDS);
-    if (!validPriceIds.includes(priceId)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid price ID' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+   try {
+const { priceId, type, fileName, email, fingerprint } = await request.json();
+
+     // Ensure env variables exist
+     // inside handlePaymentCreation, right after parsing JSON:
+if (!env.STRIPE_SECRET_KEY) {
+  return new Response(JSON.stringify({ error: 'Missing STRIPE_SECRET_KEY' }), {
+    status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+if (!env.FRONTEND_URL) {
+  return new Response(JSON.stringify({ error: 'Missing FRONTEND_URL' }), {
+    status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+const validPriceIds = Object.values(STRIPE_PRICE_IDS);
+if (!validPriceIds.includes(priceId)) {
+  return new Response(JSON.stringify({ error: 'Invalid price ID' }), {
+    status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+    // Validate plan type
+    if (!['single_track','day_pass','dj_pro','studio_elite'].includes(type)) {
+      return new Response(JSON.stringify({ error: 'Invalid plan type' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type':'application/json' }
+      });
     }
 
-const stripe = new Stripe(env.STRIPE_SECRET_KEY);
-
-
-    
-    const isSubscription = type === 'dj_pro' || type === 'studio_elite';
-    
-    const sessionConfig = {
-      payment_method_types: ['card'],
-      mode: isSubscription ? 'subscription' : 'payment',
-      success_url: `${env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.FRONTEND_URL}/cancel`,
-      metadata: {
-        type: type,
-        fileName: fileName || '',
-        fingerprint: fingerprint || 'unknown',
-        processingType: 'audio_cleaning',
-        timestamp: Date.now().toString()
-      },
-      line_items: [{
-        price: priceId,
-        quantity: 1
-      }]
-    };
-
-    if (email) {
-      sessionConfig.customer_email = email;
+    // Anti-tamper: enforce mapping between type and priceId
+    if (PRICE_BY_TYPE[type] !== priceId) {
+      return new Response(JSON.stringify({ error: 'Price/type mismatch' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type':'application/json' }
+      });
     }
 
-    if (isSubscription) {
-      sessionConfig.allow_promotion_codes = true;
-      sessionConfig.billing_address_collection = 'required';
-    }
+     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+       apiVersion: '2024-06-20',
+       httpClient: Stripe.createFetchHttpClient(),
+     });
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
+     const isSubscription = (type === 'dj_pro' || type === 'studio_elite');
 
-    // Store payment intent
+     const session = await stripe.checkout.sessions.create({
+ mode: isSubscription ? 'subscription' : 'payment',
+ line_items: [{ price: priceId, quantity: 1 }],
+ success_url: `${(env.FRONTEND_URL || '').replace(/\/+$/,'')}/success?session_id={CHECKOUT_SESSION_ID}`,
+ cancel_url: `${(env.FRONTEND_URL || '').replace(/\/+$/,'')}/cancel`,
+ customer_email: email || undefined,
+ allow_promotion_codes: isSubscription || undefined,
+ billing_address_collection: isSubscription ? 'required' : 'auto',
+ metadata: {
+         type: type || '',
+         fileName: fileName || '',
+         fingerprint: fingerprint || 'unknown',
+         processingType: 'audio_cleaning',
+         ts: String(Date.now()),
+       },
+     });
+
     await storePaymentIntent(session.id, type, priceId, fingerprint, env);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        sessionId: session.id,
-        url: session.url
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    return new Response(JSON.stringify({ success: true, sessionId: session.id, url: session.url }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   } catch (error) {
-    console.error('Payment creation error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Payment creation failed', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // Log full Stripe error shape when available
+    console.error('Payment creation error:', error?.message, error?.raw);
+    return new Response(JSON.stringify({
+      error: 'Payment creation failed',
+      details: error?.message || 'unknown'
+    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 }
 
+// Enhanced Webhook Handler with Access Management
 // Enhanced Webhook Handler with Access Management
 async function handleStripeWebhook(request, env, corsHeaders) {
   if (request.method !== 'POST') {
     return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   }
 
-  try {
-    const body = await request.text();
-    const signature = request.headers.get('stripe-signature');
-    
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16',
+  if (!env.STRIPE_SECRET_KEY) {
+    return new Response(JSON.stringify({ error: 'Missing STRIPE_SECRET_KEY' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
-    
+  }
+  if (!env.STRIPE_WEBHOOK_SECRET) {
+    return new Response(JSON.stringify({ error: 'Missing STRIPE_WEBHOOK_SECRET' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const signature = request.headers.get('stripe-signature');
+  if (!signature) {
+    return new Response(JSON.stringify({ error: 'Missing stripe-signature header' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+    apiVersion: '2024-06-20',
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+
+  try {
+    // IMPORTANT: read raw body for verification
+    const body = await request.text();
     const event = stripe.webhooks.constructEvent(body, signature, env.STRIPE_WEBHOOK_SECRET);
 
     switch (event.type) {
@@ -244,16 +287,16 @@ async function handleStripeWebhook(request, env, corsHeaders) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
-    return new Response('OK', { headers: corsHeaders });
-
+    return new Response('OK', { status: 200, headers: corsHeaders });
   } catch (error) {
-    console.error('Webhook error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Webhook processing failed' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error('Webhook error:', error?.message);
+    return new Response(JSON.stringify({ error: 'Webhook processing failed' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 }
+  
+
 
 // Access Activation Handler
 async function handleAccessActivation(request, env, corsHeaders) {
@@ -730,30 +773,28 @@ async function validateUserAccess(fingerprint, planType, env) {
   }
 }
 
-async function storeProcessingResult(fingerprint, result, env) {
-  try {
-    await env.DB.prepare(`
-      INSERT INTO processing_history 
-      (user_id, process_id, original_filename, file_size, detected_languages, 
-       words_removed, processing_time_ms, plan_type, result, created_at, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      fingerprint,
-      result.processId,
-      result.metadata.originalFileName,
-      result.metadata.fileSize,
-      JSON.stringify(result.detectedLanguages),
-      result.wordsRemoved,
-      100, // Processing time placeholder
-      result.metadata.plan || 'free',
-      JSON.stringify(result),
-      Date.now(),
-      'completed'
-    ).run();
-  } catch (error) {
-    console.error('Storage error:', error);
-  }
+async function storeProcessingResult(fingerprint, result, env, planType) {
+  await env.DB.prepare(`
+    INSERT INTO processing_history 
+    (user_id, process_id, original_filename, file_size, detected_languages, 
+     words_removed, processing_time_ms, plan_type, result, created_at, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    fingerprint,
+    result.processId,
+    result.metadata.originalFileName,
+    result.metadata.fileSize,
+    JSON.stringify(result.detectedLanguages),
+    result.wordsRemoved,
+    100,
+    planType || 'free',
+    JSON.stringify(result),
+    Date.now(),
+    'completed'
+  ).run();
 }
+// and call: await storeProcessingResult(fingerprint, processingResult, env, planType);
+// Removed stray closing brace to fix syntax error
 
 async function updateUsageStats(fingerprint, planType, fileSize, env) {
   try {
@@ -798,19 +839,22 @@ async function storePaymentIntent(sessionId, type, priceId, fingerprint, env) {
 async function handlePaymentSuccess(session, env) {
   const { type, fingerprint } = session.metadata;
   const email = session.customer_email;
-  
+
+  // If it's a subscription checkout, session.subscription holds the ID (e.g. "sub_...")
+  const stripeSubscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
+
   // Update payment status
   await env.DB.prepare(`
     UPDATE payment_transactions 
     SET status = 'completed', updated_at = ?
     WHERE stripe_session_id = ?
   `).bind(Date.now(), session.id).run();
-  
+
   // Activate subscription
   await env.DB.prepare(`
     INSERT OR REPLACE INTO user_subscriptions 
-    (user_id, plan_type, created_at, expires_at, is_active, stripe_session_id, email)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    (user_id, plan_type, created_at, expires_at, is_active, stripe_session_id, stripe_subscription_id, email)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     fingerprint,
     type,
@@ -818,11 +862,16 @@ async function handlePaymentSuccess(session, env) {
     type === 'day_pass' ? Date.now() + (24 * 60 * 60 * 1000) : null,
     true,
     session.id,
+    stripeSubscriptionId,   // << store it here
     email
   ).run();
-  
+
   console.log(`Payment successful: ${type} for ${email || fingerprint}`);
 }
+
+  
+  
+  
 
 async function handleSubscriptionRenewal(invoice, env) {
   console.log(`Subscription renewed: ${invoice.customer}`);
@@ -882,63 +931,13 @@ function getPriceAmount(priceId) {
   return amounts[priceId] || 0;
 }
 
-// Simplified Stripe Class for Worker Environment
-class Stripe {
-  constructor(apiKey, options = {}) {
-    this.apiKey = apiKey;
-    this.apiVersion = options.apiVersion || '2023-10-16';
-    this.baseURL = 'https://api.stripe.com/v1';
-  }
 
-  async makeRequest(endpoint, method = 'GET', data = null) {
-    const url = `${this.baseURL}${endpoint}`;
-    const headers = {
-      'Authorization': `Bearer ${this.apiKey}`,
-      'Stripe-Version': this.apiVersion,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    };
 
-    const options = { method, headers };
 
-    if (data && method !== 'GET') {
-      options.body = new URLSearchParams(data).toString();
-    }
 
-    const response = await fetch(url, options);
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'Stripe API error');
-    }
-    
-    return result;
-  }
+  
+  
 
-  get checkout() {
-    return {
-      sessions: {
-        create: async (params) => {
-          return await this.makeRequest('/checkout/sessions', 'POST', params);
-        }
-      }
-    };
-  }
-
-  get webhooks() {
-    return {
-      constructEvent: (body, signature, secret) => {
-        // Simplified webhook verification
-        try {
-          const event = JSON.parse(body);
-          // In production, implement proper signature verification
-          return event;
-        } catch (error) {
-          throw new Error('Invalid webhook payload');
-        }
-      }
-    };
-  }
-}
 
 class ProcessingStateV2 {
   constructor(state, env) {
