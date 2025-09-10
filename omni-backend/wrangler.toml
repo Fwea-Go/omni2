@@ -23,7 +23,7 @@ FRONTEND_URL = "https://omni2-8d2.pages.dev"   # no trailing slash
 # STRIPE_SECRET_KEY
 # STRIPE_WEBHOOK_SECRET
 # OPENAI_API_KEY (optional)
-AUDIO_URL_SECRET
+# AUDIO_URL_SECRET
 
 # ---- D1 Database binding ----
 [[d1_databases]]
