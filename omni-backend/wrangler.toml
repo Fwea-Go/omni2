@@ -11,10 +11,9 @@ ENVIRONMENT = "development"                       # default; overridden per-env 
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # Default frontend (overridden below)
 FRONTEND_URL = "http://localhost:3000"
-# Optional: unsigned mode if not provided; worker will allow unsigned in dev
-AUDIO_URL_SECRET = ""
+# NOTE: Do NOT set AUDIO_URL_SECRET here. Put it with `wrangler secret put AUDIO_URL_SECRET`. Leave unset in dev if you want unsigned.
 # Admin header token for privileged endpoints (/debug-env, /__log)
-ADMIN_API_TOKEN = "CHANGE_ME_IN_SECRETS_OR_HERE"
+ADMIN_API_TOKEN = "SET_VIA_SECRET_IN_PROD_ONLY"
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
@@ -70,7 +69,7 @@ mode = "smart"
 ENVIRONMENT = "development"
 FRONTEND_URL = "http://localhost:3000"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# In dev you can leave AUDIO_URL_SECRET blank for unsigned preview URLs
+# In dev you can leave AUDIO_URL_SECRET blank for unsigned preview URLs. In prod it must be a secret.
 AUDIO_URL_SECRET = ""
 # Use a dev token; put the real value with `wrangler secret put ADMIN_API_TOKEN`
 ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"
@@ -114,11 +113,7 @@ class_name = "ProcessingStateV2"
 [env.production.vars]
 ENVIRONMENT = "production"
 FRONTEND_URL = "https://fwea-i.com"   # live site origin (no trailing slash)
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# In prod you should set a real secret (or leave blank if you want unsigned)
-AUDIO_URL_SECRET = ""
-# Set via wrangler secret ideally
-ADMIN_API_TOKEN = "PROD_SET_VIA_SECRET"
+WORKER_BASE_URL = "https://omnibackend2-production.fweago-flavaz.workers.dev"
 
 # KV
 [[env.production.kv_namespaces]]
