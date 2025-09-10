@@ -155,9 +155,7 @@ async function handlePaymentCreation(request, env, corsHeaders) {
       );
     }
 
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-  httpClient: Stripe.createFetchHttpClient(),
-});
+const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
 
     
