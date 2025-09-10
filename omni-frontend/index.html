@@ -524,7 +524,7 @@
 
         <div class="waveform-container"><div class="waveform" id="waveform"></div></div>
 
-        <audio id="player" preload="metadata" style="width:100%; display:none;"></audio>
+        <audio id="player" preload="metadata" crossorigin="anonymous" style="width:100%; display:none;"></audio>
 
         <div class="player-controls">
           <button class="play-btn" id="playBtn">▶️</button>
@@ -632,6 +632,12 @@
     <div class="footer-content">
       <div class="footer-copyright">
         © 2025 <span class="footer-brand">Fxckin With Everything Around - Intelligence</span>. All rights reserved.
+      </div>
+      <div id="admin-debug" style="display:none; margin-top:8px; font-size:0.85rem;">
+        <button id="debugBtn" style="padding:6px 10px; border-radius:8px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); cursor:pointer;">
+          🔎 Backend Debug
+        </button>
+        <span id="debugStatus" style="margin-left:8px; color:var(--text-secondary);"></span>
       </div>
       <div style="color: var(--text-secondary); font-size: 0.75rem;">
         Professional audio cleaning technology • No refunds policy • Terms apply
@@ -1157,9 +1163,37 @@ function notify(message, type){
 ///////////////////////
 // Admin mode flag
 ///////////////////////
+// Admin mode flag
 (function checkAdmin(){
   const isAdmin = location.search.includes('admin=true') || localStorage.getItem('fwea_admin')==='true';
   if(isAdmin){ document.body.classList.add('admin-mode'); console.log('Admin mode active'); }
+    const dbg = document.getElementById('admin-debug');
+    if(dbg){
+      dbg.style.display = 'block';
+      const btn = document.getElementById('debugBtn');
+      const out = document.getElementById('debugStatus');
+      if(btn){
+        btn.onclick = async ()=>{
+          out.textContent = 'Checking backend…';
+          try{
+            const r = await fetch(`${CONFIG.API_BASE_URL}/debug-env`, { method:'GET' });
+            const j = await r.json();
+            out.textContent = (r.ok ? 'OK • ' : 'ERR • ') + `R2:${j.has_R2?'✅':'❌'} DB:${j.has_DB?'✅':'❌'} AI:${j.has_AI?'✅':'❌'} KV:${j.has_PROFANITY_KV?'✅':'❌'} BASE:${j.workerBase||'—'}`;
+          }catch(e){ out.textContent = 'Failed to reach backend.'; }
+        };
+      }
+    }
+  try{
+    const u = new URL(location.href);
+    const override = u.searchParams.get('api');
+    if(override){
+      const o = new URL(override);
+      if(o.protocol.startsWith('http')){
+        CONFIG.API_BASE_URL = `${o.protocol}//${o.host}`;
+        console.log('API base overridden to', CONFIG.API_BASE_URL);
+      }
+    }
+  }catch{}
 })();
 
 // minimal global to satisfy any external callbacks
