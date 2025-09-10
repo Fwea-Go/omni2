@@ -52,8 +52,10 @@ export default {
   async fetch(request, env) {
     // ---------- CORS (echo only if origin is in allowlist) ----------
     const reqOrigin = request.headers.get('Origin') || '';
+    const workerOrigin = new URL(request.url).origin;
     const allowList = [
       (env.FRONTEND_URL || '').replace(/\/+$/, ''),
+      workerOrigin,
       'http://localhost:3000',
       'http://127.0.0.1:3000'
     ].filter(Boolean);
@@ -71,6 +73,7 @@ export default {
     }
 
     const url = new URL(request.url);
+    const workerBase = getWorkerBase(env, request);
 
     // signed audio streaming
     if (url.pathname.startsWith('/audio/')) {
@@ -113,6 +116,26 @@ export default {
 /* =========================
    Helpers — signing & range
    ========================= */
+
+function getWorkerBase(env, request) {
+  // Prefer explicit env var
+  let base = (env.WORKER_BASE_URL || '').trim();
+  if (base) {
+    // Ensure scheme + https + no trailing slash
+    if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
+    try { const u = new URL(base); base = 'https://' + u.host; } catch {}
+    return base.replace(/\/+$/, '');
+  }
+  // Fallback to this worker's own origin
+  try {
+    const origin = new URL(request.url).origin;
+    // Force https scheme to avoid mixed content from http previews
+    const u = new URL(origin);
+    return 'https://' + u.host;
+  } catch {
+    return '';
+  }
+}
 
 async function hmacSHA256(message, secret) {
   const enc = new TextEncoder();
@@ -204,6 +227,7 @@ async function handleAudioDownload(request, env, corsHeaders) {
     'Accept-Ranges': 'bytes',
     'Cache-Control': key.startsWith('previews/') ? 'public, max-age=3600' : 'private, max-age=7200'
   };
+  headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges';
 
   if (isPartial) {
     const start = r2Obj.range.offset;
@@ -281,7 +305,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     }
 
     // AI processing
-    const processingResult = await processAudioWithAI(audioFile, planType, fingerprint, env);
+    const processingResult = await processAudioWithAI(audioFile, planType, fingerprint, env, request, getWorkerBase(env, request));
 
     // Persist & analytics
     await storeProcessingResult(fingerprint, processingResult, env, planType);
@@ -553,7 +577,7 @@ async function handleEventTracking(request, env, corsHeaders) {
    AI pipeline (stubs + Whisper)
    ========================= */
 
-async function processAudioWithAI(audioFile, planType, fingerprint, env) {
+async function processAudioWithAI(audioFile, planType, fingerprint, env, request, resolvedBase) {
   const audioBuffer = await audioFile.arrayBuffer();
 
   // Language detection (best-effort; guarantees an array so the UI shows chips)
@@ -598,7 +622,9 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env) {
     fingerprint,
     env,
     audioFile.type,
-    audioFile.name
+    audioFile.name,
+    request,
+    resolvedBase
   );
 
   return {
@@ -671,16 +697,11 @@ function removeProfanityFromText(text, languages) {
   return (text || '').replace(/\b(fuck|shit|damn|hell|bitch|ass|crap|piss)\b/gi, '[CLEANED]');
 }
 
-async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mime = 'audio/mpeg', originalName = 'track') {
+async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mime = 'audio/mpeg', originalName = 'track', request = null, resolvedBase = null) {
   const watermarkId = generateWatermarkId(fingerprint);
 
-  // Absolute base URL for signed links (the frontend expects absolute urls)
-  let base = (env.WORKER_BASE_URL || '').replace(/\/+$/, '');
-  if (!base) {
-    // Fallback to this worker’s hostname
-    const zone = env.WORKER_BASE_FALLBACK || ''; // optional second env if you want
-    base = zone || '';
-  }
+  // Absolute base URL for signed links (always https, no trailing slash)
+  const base = (resolvedBase && resolvedBase.trim()) || getWorkerBase(env, request);
 
   // Preview (simple truncate; placeholder math)
   const previewBytes = Math.min(audioBuffer.byteLength, previewDuration * 44100 * 2);
