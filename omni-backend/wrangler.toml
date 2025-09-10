@@ -13,7 +13,6 @@ WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 FRONTEND_URL = "http://localhost:3000"
 # NOTE: Do NOT set AUDIO_URL_SECRET here. Put it with `wrangler secret put AUDIO_URL_SECRET`. Leave unset in dev if you want unsigned.
 # Admin header token for privileged endpoints (/debug-env, /__log)
-ADMIN_API_TOKEN = "SET_VIA_SECRET_IN_PROD_ONLY"
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
@@ -70,7 +69,6 @@ ENVIRONMENT = "development"
 FRONTEND_URL = "http://localhost:3000"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # In dev you can leave AUDIO_URL_SECRET blank for unsigned preview URLs. In prod it must be a secret.
-AUDIO_URL_SECRET = ""
 # Use a dev token; put the real value with `wrangler secret put ADMIN_API_TOKEN`
 ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"
 
