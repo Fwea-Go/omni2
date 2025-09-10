@@ -1,62 +1,66 @@
--- FWEA-I Complete Database Schema
--- Production-ready schema with enhanced security and analytics
--- Run: wrangler d1 execute fwea-database --file=schema.sql
+-- ==========================================================
+-- FWEA-I Complete Database Schema (D1 / SQLite)
+-- Run: wrangler d1 execute omnidb --file=schema.sql
+-- ==========================================================
 
--- Enable foreign keys
 PRAGMA foreign_keys = ON;
 
--- User subscriptions table with enhanced security
+-- =========================
+-- TABLES
+-- =========================
+
+-- User subscriptions
 CREATE TABLE IF NOT EXISTS user_subscriptions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL, -- Browser fingerprint hash
-  plan_type TEXT NOT NULL CHECK (plan_type IN ('single_track', 'day_pass', 'dj_pro', 'studio_elite')),
-  created_at INTEGER NOT NULL,
-  expires_at INTEGER, -- NULL for perpetual subscriptions
-  updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
-  is_active BOOLEAN DEFAULT TRUE,
+  user_id TEXT NOT NULL,                                    -- browser fingerprint (hashed)
+  plan_type TEXT NOT NULL CHECK (plan_type IN ('single_track','day_pass','dj_pro','studio_elite')),
+  created_at INTEGER NOT NULL,                              -- ms epoch
+  expires_at INTEGER,                                       -- NULL = no expiry
+  updated_at INTEGER DEFAULT (strftime('%s','now')*1000),
+  is_active BOOLEAN DEFAULT TRUE,                           -- 1/0
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
   stripe_session_id TEXT,
   email TEXT,
   device_count INTEGER DEFAULT 1,
-  last_accessed INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+  last_accessed INTEGER DEFAULT (strftime('%s','now')*1000),
   UNIQUE(user_id, plan_type)
 );
 
--- Processing history with detailed metadata
+-- Processing history
 CREATE TABLE IF NOT EXISTS processing_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id TEXT NOT NULL,
   process_id TEXT NOT NULL UNIQUE,
   original_filename TEXT,
   file_size INTEGER,
-  detected_languages TEXT, -- JSON array
+  detected_languages TEXT,             -- JSON array
   words_removed INTEGER DEFAULT 0,
-  profanity_timestamps TEXT, -- JSON array of timestamps
+  profanity_timestamps TEXT,           -- JSON array of {start,end,word,...}
   processing_time_ms INTEGER,
   plan_type TEXT DEFAULT 'free',
-  result TEXT, -- JSON blob with full result data
+  result TEXT,                         -- JSON blob (full result)
   watermark_id TEXT,
   ip_address TEXT,
   user_agent TEXT,
-  created_at INTEGER NOT NULL,
-  status TEXT DEFAULT 'completed' CHECK (status IN ('processing', 'completed', 'failed', 'expired')),
-  expires_at INTEGER -- When temp files expire
+  created_at INTEGER NOT NULL,         -- ms epoch
+  status TEXT DEFAULT 'completed' CHECK (status IN ('processing','completed','failed','expired')),
+  expires_at INTEGER                   -- when temp files expire
 );
 
--- Admin users with role-based permissions
+-- Admin users (RBAC)
 CREATE TABLE IF NOT EXISTS admin_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
   permissions TEXT DEFAULT '["full_access"]', -- JSON array
   created_at INTEGER NOT NULL,
-  updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+  updated_at INTEGER DEFAULT (strftime('%s','now')*1000),
   is_active BOOLEAN DEFAULT TRUE,
   last_login INTEGER,
   created_by INTEGER REFERENCES admin_users(id)
 );
 
--- Payment transactions with detailed tracking
+-- Payment transactions
 CREATE TABLE IF NOT EXISTS payment_transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   stripe_session_id TEXT UNIQUE,
@@ -64,11 +68,11 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   stripe_subscription_id TEXT,
   user_id TEXT NOT NULL,
   plan_type TEXT NOT NULL,
-  amount INTEGER NOT NULL, -- in cents
+  amount INTEGER NOT NULL,           -- cents
   currency TEXT DEFAULT 'usd',
-  status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled')),
+  status TEXT NOT NULL CHECK (status IN ('pending','processing','completed','failed','refunded','cancelled')),
   failure_reason TEXT,
-  metadata TEXT, -- JSON blob
+  metadata TEXT,                     -- JSON
   ip_address TEXT,
   user_agent TEXT,
   created_at INTEGER NOT NULL,
@@ -76,38 +80,38 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   completed_at INTEGER
 );
 
--- Enhanced usage analytics
+-- Usage analytics (lightweight events)
 CREATE TABLE IF NOT EXISTS usage_analytics (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id TEXT,
-  session_id TEXT, -- Track user sessions
-  event_type TEXT NOT NULL, -- 'page_view', 'file_upload', 'payment', etc.
-  event_action TEXT, -- Specific action within event type
+  session_id TEXT,
+  event_type TEXT NOT NULL,          -- 'page_view', 'file_upload', 'payment', ...
+  event_action TEXT,                 -- sub-action
   plan_type TEXT,
   file_size INTEGER,
   processing_time_ms INTEGER,
-  languages_detected TEXT, -- JSON array
+  languages_detected TEXT,           -- JSON array
   user_agent TEXT,
   ip_address TEXT,
   referrer TEXT,
-  country TEXT, -- From CF headers
-  device_type TEXT, -- mobile, desktop, tablet
+  country TEXT,
+  device_type TEXT,                  -- mobile/desktop/tablet
   created_at INTEGER NOT NULL,
-  value REAL -- For conversion tracking
+  value REAL
 );
 
--- File storage references with security
+-- File storage references for R2 objects
 CREATE TABLE IF NOT EXISTS file_storage (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   process_id TEXT NOT NULL,
-  file_type TEXT NOT NULL CHECK (file_type IN ('original', 'preview', 'full', 'watermarked')),
-  storage_key TEXT NOT NULL UNIQUE, -- R2 object key
+  file_type TEXT NOT NULL CHECK (file_type IN ('original','preview','full','watermarked')),
+  storage_key TEXT NOT NULL UNIQUE,  -- R2 key
   file_size INTEGER,
   mime_type TEXT,
   watermark_id TEXT,
   access_count INTEGER DEFAULT 0,
-  max_access_count INTEGER, -- Limit downloads
-  expires_at INTEGER, -- NULL for permanent files
+  max_access_count INTEGER,
+  expires_at INTEGER,
   created_at INTEGER NOT NULL,
   last_accessed INTEGER
 );
@@ -126,30 +130,30 @@ CREATE TABLE IF NOT EXISTS verification_codes (
   ip_address TEXT
 );
 
--- Rate limiting table
+-- Simple rate limits (per endpoint / window)
 CREATE TABLE IF NOT EXISTS rate_limits (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  identifier TEXT NOT NULL, -- IP or user_id
+  identifier TEXT NOT NULL,          -- IP or user_id
   endpoint TEXT NOT NULL,
   requests INTEGER DEFAULT 1,
   window_start INTEGER NOT NULL,
-  window_size INTEGER DEFAULT 3600000, -- 1 hour in ms
+  window_size INTEGER DEFAULT 3600000, -- 1h ms
   created_at INTEGER NOT NULL,
   UNIQUE(identifier, endpoint, window_start)
 );
 
--- System configuration
+-- System config (key/value)
 CREATE TABLE IF NOT EXISTS system_config (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   config_key TEXT NOT NULL UNIQUE,
   config_value TEXT NOT NULL,
-  config_type TEXT DEFAULT 'string' CHECK (config_type IN ('string', 'number', 'boolean', 'json')),
+  config_type TEXT DEFAULT 'string' CHECK (config_type IN ('string','number','boolean','json')),
   description TEXT,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+  updated_at INTEGER DEFAULT (strftime('%s','now')*1000)
 );
 
--- Audit log for security
+-- Audit log
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id TEXT,
@@ -162,12 +166,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at INTEGER NOT NULL
 );
 
--- Webhook events log
+-- Webhook events (Stripe)
 CREATE TABLE IF NOT EXISTS webhook_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   stripe_event_id TEXT UNIQUE,
   event_type TEXT NOT NULL,
-  event_data TEXT NOT NULL, -- JSON blob
+  event_data TEXT NOT NULL,   -- JSON blob
   processed BOOLEAN DEFAULT FALSE,
   processing_attempts INTEGER DEFAULT 0,
   last_error TEXT,
@@ -175,160 +179,163 @@ CREATE TABLE IF NOT EXISTS webhook_events (
   processed_at INTEGER
 );
 
--- ============================================
--- INDEXES for Performance Optimization
--- ============================================
+-- =========================
+-- INDEXES
+-- =========================
 
--- User subscriptions indexes
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON user_subscriptions(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_plan_type ON user_subscriptions(plan_type);
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_expires_at ON user_subscriptions(expires_at);
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_active ON user_subscriptions(is_active, expires_at);
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_stripe_session ON user_subscriptions(stripe_session_id);
+-- Subscriptions hot paths
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id          ON user_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_plan_type        ON user_subscriptions(plan_type);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_expires_at       ON user_subscriptions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_active           ON user_subscriptions(is_active, expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_stripe_session   ON user_subscriptions(stripe_session_id);
+-- Extra composites to match worker queries
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_plan_active ON user_subscriptions(user_id, plan_type, is_active);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_session_plan ON user_subscriptions(user_id, stripe_session_id, plan_type);
 
--- Processing history indexes
-CREATE INDEX IF NOT EXISTS idx_processing_history_user_id ON processing_history(user_id);
+-- Processing history
+CREATE INDEX IF NOT EXISTS idx_processing_history_user_id   ON processing_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_processing_history_created_at ON processing_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_processing_history_plan_type ON processing_history(plan_type);
-CREATE INDEX IF NOT EXISTS idx_processing_history_status ON processing_history(status);
-CREATE INDEX IF NOT EXISTS idx_processing_history_expires_at ON processing_history(expires_at);
+CREATE INDEX IF NOT EXISTS idx_processing_history_status    ON processing_history(status);
+CREATE INDEX IF NOT EXISTS idx_processing_history_expires   ON processing_history(expires_at);
 
--- Payment transactions indexes
-CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_id ON payment_transactions(user_id);
-CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
-CREATE INDEX IF NOT EXISTS idx_payment_transactions_created_at ON payment_transactions(created_at);
+-- Payments
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_id       ON payment_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_status        ON payment_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_created_at    ON payment_transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_stripe_session ON payment_transactions(stripe_session_id);
 
--- Usage analytics indexes
+-- Analytics
 CREATE INDEX IF NOT EXISTS idx_usage_analytics_event_type ON usage_analytics(event_type);
 CREATE INDEX IF NOT EXISTS idx_usage_analytics_created_at ON usage_analytics(created_at);
-CREATE INDEX IF NOT EXISTS idx_usage_analytics_user_id ON usage_analytics(user_id);
-CREATE INDEX IF NOT EXISTS idx_usage_analytics_session ON usage_analytics(session_id);
-CREATE INDEX IF NOT EXISTS idx_usage_analytics_plan_type ON usage_analytics(plan_type);
+CREATE INDEX IF NOT EXISTS idx_usage_analytics_user_id    ON usage_analytics(user_id);
+CREATE INDEX IF NOT EXISTS idx_usage_analytics_session    ON usage_analytics(session_id);
+CREATE INDEX IF NOT EXISTS idx_usage_analytics_plan_type  ON usage_analytics(plan_type);
 
--- File storage indexes
+-- Files
 CREATE INDEX IF NOT EXISTS idx_file_storage_process_id ON file_storage(process_id);
 CREATE INDEX IF NOT EXISTS idx_file_storage_expires_at ON file_storage(expires_at);
 CREATE INDEX IF NOT EXISTS idx_file_storage_storage_key ON file_storage(storage_key);
 
--- Verification codes indexes
+-- Verification codes
 CREATE INDEX IF NOT EXISTS idx_verification_codes_email_code ON verification_codes(email, code);
 CREATE INDEX IF NOT EXISTS idx_verification_codes_expires_at ON verification_codes(expires_at);
 
--- Rate limits indexes
+-- Rate limits
 CREATE INDEX IF NOT EXISTS idx_rate_limits_identifier ON rate_limits(identifier, endpoint);
-CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start, window_size);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_window     ON rate_limits(window_start, window_size);
 
--- Audit log indexes
-CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
+-- Audit
+CREATE INDEX IF NOT EXISTS idx_audit_log_user_id    ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
-CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action     ON audit_log(action);
 
--- Webhook events indexes
+-- Webhooks
 CREATE INDEX IF NOT EXISTS idx_webhook_events_stripe_id ON webhook_events(stripe_event_id);
 CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);
 CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);
 
--- ============================================
--- VIEWS for Analytics and Reporting
--- ============================================
+-- =========================
+-- VIEWS (analytics convenience)
+-- =========================
 
--- Active subscriptions view
+-- Active subscriptions (+derived status/days_remaining)
 CREATE VIEW IF NOT EXISTS active_subscriptions AS
 SELECT 
   us.*,
   CASE 
     WHEN us.expires_at IS NULL THEN 'active'
-    WHEN us.expires_at > (strftime('%s', 'now') * 1000) THEN 'active'
+    WHEN us.expires_at > (strftime('%s','now')*1000) THEN 'active'
     ELSE 'expired'
-  END as subscription_status,
+  END AS subscription_status,
   CASE
     WHEN us.expires_at IS NOT NULL THEN 
-      ROUND((us.expires_at - (strftime('%s', 'now') * 1000)) / 86400000.0, 1)
+      ROUND((us.expires_at - (strftime('%s','now')*1000)) / 86400000.0, 1)
     ELSE NULL
-  END as days_remaining
+  END AS days_remaining
 FROM user_subscriptions us
 WHERE us.is_active = TRUE;
 
--- Processing statistics view
+-- Per-day processing stats
 CREATE VIEW IF NOT EXISTS processing_stats AS
 SELECT 
   plan_type,
-  COUNT(*) as total_processes,
-  AVG(processing_time_ms) as avg_processing_time,
-  AVG(words_removed) as avg_words_removed,
-  AVG(file_size) as avg_file_size,
-  SUM(file_size) as total_data_processed,
-  COUNT(DISTINCT user_id) as unique_users,
-  DATE(created_at / 1000, 'unixepoch') as process_date
+  COUNT(*) AS total_processes,
+  AVG(processing_time_ms) AS avg_processing_time,
+  AVG(words_removed) AS avg_words_removed,
+  AVG(file_size) AS avg_file_size,
+  SUM(file_size) AS total_data_processed,
+  COUNT(DISTINCT user_id) AS unique_users,
+  DATE(created_at/1000,'unixepoch') AS process_date
 FROM processing_history 
 WHERE status = 'completed'
-GROUP BY plan_type, DATE(created_at / 1000, 'unixepoch');
+GROUP BY plan_type, DATE(created_at/1000,'unixepoch');
 
--- Revenue analytics view
+-- Revenue by plan/day
 CREATE VIEW IF NOT EXISTS revenue_analytics AS
 SELECT 
   plan_type,
-  COUNT(*) as transaction_count,
-  SUM(amount) as total_revenue_cents,
-  ROUND(SUM(amount) / 100.0, 2) as total_revenue_dollars,
-  AVG(amount) as avg_transaction_cents,
-  COUNT(DISTINCT user_id) as unique_customers,
-  DATE(created_at / 1000, 'unixepoch') as transaction_date
+  COUNT(*) AS transaction_count,
+  SUM(amount) AS total_revenue_cents,
+  ROUND(SUM(amount)/100.0, 2) AS total_revenue_dollars,
+  AVG(amount) AS avg_transaction_cents,
+  COUNT(DISTINCT user_id) AS unique_customers,
+  DATE(created_at/1000,'unixepoch') AS transaction_date
 FROM payment_transactions 
 WHERE status = 'completed'
-GROUP BY plan_type, DATE(created_at / 1000, 'unixepoch');
+GROUP BY plan_type, DATE(created_at/1000,'unixepoch');
 
--- User engagement metrics view
+-- User engagement rollup
 CREATE VIEW IF NOT EXISTS user_engagement AS
 SELECT 
   user_id,
   plan_type,
-  COUNT(*) as total_actions,
-  COUNT(DISTINCT DATE(created_at / 1000, 'unixepoch')) as active_days,
-  MIN(created_at) as first_seen,
-  MAX(created_at) as last_seen,
-  COUNT(CASE WHEN event_type = 'file_upload' THEN 1 END) as files_uploaded,
-  COUNT(CASE WHEN event_type = 'payment' THEN 1 END) as payments_made
+  COUNT(*) AS total_actions,
+  COUNT(DISTINCT DATE(created_at/1000,'unixepoch')) AS active_days,
+  MIN(created_at) AS first_seen,
+  MAX(created_at) AS last_seen,
+  COUNT(CASE WHEN event_type='file_upload' THEN 1 END) AS files_uploaded,
+  COUNT(CASE WHEN event_type='payment' THEN 1 END) AS payments_made
 FROM usage_analytics 
 GROUP BY user_id, plan_type;
 
--- Daily usage summary view
+-- Daily usage summary
 CREATE VIEW IF NOT EXISTS daily_usage_summary AS
 SELECT 
-  DATE(created_at / 1000, 'unixepoch') as usage_date,
+  DATE(created_at/1000,'unixepoch') AS usage_date,
   plan_type,
-  COUNT(DISTINCT user_id) as unique_users,
-  COUNT(*) as total_events,
-  COUNT(CASE WHEN event_type = 'file_upload' THEN 1 END) as file_uploads,
-  COUNT(CASE WHEN event_type = 'payment' THEN 1 END) as payments,
-  SUM(file_size) as total_data_processed
+  COUNT(DISTINCT user_id) AS unique_users,
+  COUNT(*) AS total_events,
+  COUNT(CASE WHEN event_type='file_upload' THEN 1 END) AS file_uploads,
+  COUNT(CASE WHEN event_type='payment' THEN 1 END) AS payments,
+  SUM(file_size) AS total_data_processed
 FROM usage_analytics 
-GROUP BY DATE(created_at / 1000, 'unixepoch'), plan_type;
+GROUP BY DATE(created_at/1000,'unixepoch'), plan_type;
 
--- ============================================
--- TRIGGERS for Data Integrity
--- ============================================
+-- =========================
+-- TRIGGERS
+-- =========================
 
--- Update timestamp trigger for user_subscriptions
+-- Keep updated_at fresh on subs
 CREATE TRIGGER IF NOT EXISTS update_user_subscriptions_updated_at
 AFTER UPDATE ON user_subscriptions
 BEGIN
   UPDATE user_subscriptions 
-  SET updated_at = strftime('%s', 'now') * 1000 
+  SET updated_at = strftime('%s','now')*1000 
   WHERE id = NEW.id;
 END;
 
--- Update timestamp trigger for payment_transactions
+-- Keep updated_at fresh on payments
 CREATE TRIGGER IF NOT EXISTS update_payment_transactions_updated_at
 AFTER UPDATE ON payment_transactions
 BEGIN
   UPDATE payment_transactions 
-  SET updated_at = strftime('%s', 'now') * 1000 
+  SET updated_at = strftime('%s','now')*1000 
   WHERE id = NEW.id;
 END;
 
--- Audit trigger for user_subscriptions changes
+-- Audit on subscription state changes
 CREATE TRIGGER IF NOT EXISTS audit_user_subscriptions_changes
 AFTER UPDATE ON user_subscriptions
 BEGIN
@@ -339,94 +346,47 @@ BEGIN
     'user_subscriptions',
     json_object('plan_type', OLD.plan_type, 'is_active', OLD.is_active),
     json_object('plan_type', NEW.plan_type, 'is_active', NEW.is_active),
-    strftime('%s', 'now') * 1000
+    strftime('%s','now')*1000
   );
 END;
 
--- Cleanup trigger for expired verification codes
+-- Clear expired verification codes opportunistically
 CREATE TRIGGER IF NOT EXISTS cleanup_expired_verification_codes
 AFTER INSERT ON verification_codes
 BEGIN
   DELETE FROM verification_codes 
-  WHERE expires_at < strftime('%s', 'now') * 1000;
+  WHERE expires_at < strftime('%s','now')*1000;
 END;
 
--- ============================================
--- INITIAL DATA SETUP
--- ============================================
+-- =========================
+-- DEFAULTS & SEED
+-- =========================
 
--- Insert default admin user (REPLACE WITH YOUR EMAIL)
+-- Default admin (change email!)
 INSERT OR IGNORE INTO admin_users (email, permissions, created_at) 
-VALUES ('admin@yourdomain.com', '["full_access", "user_management", "analytics"]', strftime('%s', 'now') * 1000);
+VALUES ('admin@yourdomain.com','["full_access","user_management","analytics"]',strftime('%s','now')*1000);
 
--- Insert system configuration defaults
+-- System config defaults
 INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, description, created_at) VALUES
-('max_file_size_free', '52428800', 'number', 'Max file size for free users (50MB)', strftime('%s', 'now') * 1000),
-('max_file_size_premium', '104857600', 'number', 'Max file size for premium users (100MB)', strftime('%s', 'now') * 1000),
-('max_file_size_studio', '524288000', 'number', 'Max file size for studio users (500MB)', strftime('%s', 'now') * 1000),
-('preview_duration_default', '30', 'number', 'Default preview duration in seconds', strftime('%s', 'now') * 1000),
-('preview_duration_studio', '60', 'number', 'Studio preview duration in seconds', strftime('%s', 'now') * 1000),
-('file_retention_hours', '48', 'number', 'Hours to keep processed files', strftime('%s', 'now') * 1000),
-('rate_limit_uploads_per_hour', '10', 'number', 'Max uploads per hour for free users', strftime('%s', 'now') * 1000),
-('maintenance_mode', 'false', 'boolean', 'Global maintenance mode flag', strftime('%s', 'now') * 1000);
+('max_file_size_free','52428800','number','Max file size for free users (50MB)',strftime('%s','now')*1000),
+('max_file_size_premium','104857600','number','Max file size for premium users (100MB)',strftime('%s','now')*1000),
+('max_file_size_studio','524288000','number','Max file size for studio users (500MB)',strftime('%s','now')*1000),
+('preview_duration_default','30','number','Default preview duration (s)',strftime('%s','now')*1000),
+('preview_duration_studio','60','number','Studio preview duration (s)',strftime('%s','now')*1000),
+('file_retention_hours','48','number','Hours to keep processed files',strftime('%s','now')*1000),
+('rate_limit_uploads_per_hour','10','number','Max uploads/hour for free users',strftime('%s','now')*1000),
+('maintenance_mode','false','boolean','Global maintenance mode flag',strftime('%s','now')*1000);
 
--- Sample data for testing (REMOVE IN PRODUCTION)
--- INSERT OR IGNORE INTO user_subscriptions (user_id, plan_type, created_at, is_active)
--- VALUES ('test_user_fingerprint_123', 'dj_pro', strftime('%s', 'now') * 1000, TRUE);
+-- Schema version
+INSERT OR REPLACE INTO system_config (config_key, config_value, config_type, description, created_at)
+VALUES ('schema_version','1.0.1','string','Database schema version',strftime('%s','now')*1000);
 
--- ============================================
--- STORED PROCEDURES (SQLite Functions)
--- ============================================
+-- =========================
+-- OPTIONAL CLEANUPS (manual/cron)
+-- =========================
+-- DELETE FROM file_storage WHERE expires_at < strftime('%s','now')*1000;
+-- DELETE FROM processing_history WHERE created_at < strftime('%s','now','-30 days')*1000 AND status='completed';
+-- DELETE FROM verification_codes WHERE expires_at < strftime('%s','now')*1000;
+-- DELETE FROM usage_analytics WHERE created_at < strftime('%s','now','-90 days')*1000;
 
--- Note: SQLite doesn't support stored procedures, but we can create helper views
--- For complex operations, implement in the Worker code
-
--- Function to get user plan (implement in Worker)
--- CREATE FUNCTION get_user_plan(fingerprint TEXT) RETURNS TEXT AS $$
--- This would be implemented in the Worker code
-
--- ============================================
--- CLEANUP QUERIES (Run manually or via cron)
--- ============================================
-
--- Clean up expired files (run daily)
--- DELETE FROM file_storage WHERE expires_at < strftime('%s', 'now') * 1000;
-
--- Clean up old processing history (run weekly)
--- DELETE FROM processing_history WHERE created_at < strftime('%s', 'now', '-30 days') * 1000 AND status = 'completed';
-
--- Clean up expired verification codes (run hourly)
--- DELETE FROM verification_codes WHERE expires_at < strftime('%s', 'now') * 1000;
-
--- Clean up old analytics data (run monthly)
--- DELETE FROM usage_analytics WHERE created_at < strftime('%s', 'now', '-90 days') * 1000;
-
--- ============================================
--- SECURITY NOTES
--- ============================================
-
-/*
-1. All user_id fields store hashed browser fingerprints, not actual user data
-2. Email addresses are only stored when explicitly provided by users
-3. File storage keys are UUIDs with no personal information
-4. All timestamps are in milliseconds since epoch
-5. Sensitive operations are logged in audit_log
-6. Rate limiting prevents abuse
-7. File retention policies prevent long-term storage of user content
-8. Foreign key constraints maintain referential integrity
-9. Check constraints prevent invalid data
-10. Indexes optimize query performance
-*/
-
--- ============================================
--- SCHEMA VERSION
--- ============================================
-
-INSERT OR REPLACE INTO system_config (config_key, config_value, config_type, description, created_at) 
-VALUES ('schema_version', '1.0.0', 'string', 'Database schema version', strftime('%s', 'now') * 1000);
-
--- Schema creation complete
--- Total tables: 11
--- Total indexes: 25  
--- Total views: 5
--- Total triggers: 4
+-- End of schema
