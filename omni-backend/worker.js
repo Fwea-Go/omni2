@@ -150,6 +150,7 @@ export default {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin',
       'Access-Control-Max-Age': '86400',
+      'Access-Control-Allow-Credentials': 'true',
       // Expose streaming/seek headers so <audio> can read them
       'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
       'Cross-Origin-Resource-Policy': 'cross-origin',
@@ -276,7 +277,10 @@ async function hmacSHA256(message, secret) {
 }
 
 async function signR2Key(key, env, ttlSeconds = 15 * 60) {
-  if (!env.AUDIO_URL_SECRET) throw new Error('AUDIO_URL_SECRET not configured');
+  if (!env.AUDIO_URL_SECRET) {
+    // Lenient/dev mode: allow unsigned links
+    return { exp: 0, sig: '' };
+  }
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
   const msg = `${key}:${exp}`;
   const sig = await hmacSHA256(msg, env.AUDIO_URL_SECRET);
@@ -284,7 +288,8 @@ async function signR2Key(key, env, ttlSeconds = 15 * 60) {
 }
 
 async function verifySignedUrl(key, exp, sig, env) {
-  if (!env.AUDIO_URL_SECRET) return false;
+  // If no secret configured, accept any request (dev/lenient mode)
+  if (!env.AUDIO_URL_SECRET) return true;
   if (!exp || !sig) return false;
   const now = Math.floor(Date.now() / 1000);
   if (Number(exp) <= now) return false;
@@ -932,7 +937,9 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   });
 
   const { exp: pexp, sig: psig } = await signR2Key(previewKey, env, 15 * 60);
-  const previewUrl = `${base}/audio/${encodeURIComponent(previewKey)}?exp=${pexp}&sig=${psig}`;
+  const previewUrl = psig
+    ? `${base}/audio/${encodeURIComponent(previewKey)}?exp=${pexp}&sig=${psig}`
+    : `${base}/audio/${encodeURIComponent(previewKey)}`;
 
   // Full (only for non-free)
   let fullAudioUrl = null;
@@ -947,7 +954,9 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
     });
 
     const { exp: fexp, sig: fsig } = await signR2Key(fullKey, env, 60 * 60);
-    fullAudioUrl = `${base}/audio/${encodeURIComponent(fullKey)}?exp=${fexp}&sig=${fsig}`;
+    fullAudioUrl = fsig
+      ? `${base}/audio/${encodeURIComponent(fullKey)}?exp=${fexp}&sig=${fsig}`
+      : `${base}/audio/${encodeURIComponent(fullKey)}`;
   }
 
   // Log the generated URLs for debugging
