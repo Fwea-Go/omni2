@@ -78,7 +78,7 @@ WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # KV
 [[env.production.kv_namespaces]]
 binding = "CACHE"
-id = "427859929f0b463bb13c1765ebb579b8"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
 # D1
 [[env.production.d1_databases]]
