@@ -153,7 +153,9 @@ export default {
       // Expose streaming/seek headers so <audio> can read them
       'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
       'Cross-Origin-Resource-Policy': 'cross-origin',
-      'Timing-Allow-Origin': '*'
+      'Timing-Allow-Origin': '*',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp'
     };
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -207,6 +209,12 @@ export default {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
+        }
+        case '/__log': {
+          if (!isAdminRequest(request, env)) return new Response('Forbidden', { status: 403, headers: corsHeaders });
+          const body = await request.text();
+          console.log('[ADMIN LOG]', body);
+          return new Response('OK', { headers: corsHeaders });
         }
         default:
           return new Response('Not Found', { status: 404, headers: corsHeaders });
@@ -343,7 +351,6 @@ async function handleAudioDownload(request, env, corsHeaders) {
   const isPartial = Boolean(r2Obj.range);
   const size = r2Obj.size;
   const mime = (r2Obj.httpMetadata && r2Obj.httpMetadata.contentType) || 'audio/mpeg';
-
   const headers = {
     ...corsHeaders,
     'Content-Type': mime,
@@ -352,6 +359,10 @@ async function handleAudioDownload(request, env, corsHeaders) {
   };
   headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges, Content-Length';
   headers['Content-Disposition'] = key.startsWith('previews/') ? 'inline; filename="preview.mp3"' : 'inline; filename="full.mp3"';
+  if (!mime.startsWith('audio/')) {
+    // Force audio content-type to help <audio> tags render
+    headers['Content-Type'] = 'audio/mpeg';
+  }
 
   if (isPartial) {
     const start = r2Obj.range.offset;
@@ -434,6 +445,11 @@ async function handleAudioProcessing(request, env, corsHeaders) {
 
     // AI processing
     const processingResult = await processAudioWithAI(audioFile, effectivePlan, fingerprint, env, request, getWorkerBase(env, request));
+
+    // Defensive check for URLs
+    if (!processingResult.previewUrl) {
+      console.warn('No previewUrl generated; check R2 binding and AUDIO_URL_SECRET');
+    }
 
     // Persist & analytics
     await storeProcessingResult(fingerprint, processingResult, env, planType);
@@ -708,14 +724,49 @@ async function handleEventTracking(request, env, corsHeaders) {
 async function processAudioWithAI(audioFile, planType, fingerprint, env, request, resolvedBase) {
   const audioBuffer = await audioFile.arrayBuffer();
 
+  // Safety guard: empty or tiny file
+  if (!audioBuffer || audioBuffer.byteLength < 64) {
+    return {
+      processId: generateProcessId(),
+      detectedLanguages: ['English'],
+      wordsRemoved: 0,
+      profanityTimestamps: [],
+      originalDuration: 0,
+      processedDuration: 0,
+      previewUrl: null,
+      previewDuration: 0,
+      fullAudioUrl: null,
+      quality: getQualityForPlan(planType),
+      processingTime: Date.now(),
+      watermarkId: generateWatermarkId(fingerprint),
+      metadata: {
+        originalFileName: audioFile.name,
+        fileSize: 0,
+        format: audioFile.type || 'application/octet-stream',
+        bitrate: getBitrateForPlan(planType),
+        fingerprint
+      }
+    };
+  }
+
   // Language detection (best-effort; guarantees an array so the UI shows chips)
   let languages = ['English'];
   try {
-    const resp = await env.AI.run('@cf/openai/whisper', {
-      audio: [...new Uint8Array(audioBuffer.slice(0, 1024 * 1024))]
-    });
-    const extracted = extractLanguagesFromTranscription(resp?.text || '');
-    if (extracted && extracted.length) languages = extracted;
+    if (env.AI && typeof env.AI.run === 'function') {
+      // Use only the first 1MB for language sniffing to avoid OOM
+      const sniff = audioBuffer.byteLength > 1024 * 1024 ? audioBuffer.slice(0, 1024 * 1024) : audioBuffer;
+      const resp = await env.AI.run('@cf/openai/whisper', {
+        audio: [...new Uint8Array(sniff)]
+      }).catch((e) => ({ error: e?.message || String(e) }));
+      if (resp && !resp.error) {
+        const extracted = extractLanguagesFromTranscription(resp?.text || '');
+        if (extracted && extracted.length) languages = extracted;
+      } else {
+        console.warn('Whisper sniff error:', resp?.error);
+      }
+    } else {
+      console.warn('env.AI missing; skipping language detection');
+    }
   } catch (e) {
     console.warn('Language detection fallback:', e?.message);
   }
@@ -723,22 +774,36 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
   // Full transcription & profanity (best-effort)
   let profanityResults = { wordsRemoved: 0, timestamps: [], cleanTranscription: '' };
   try {
-    const transcription = await env.AI.run('@cf/openai/whisper', {
-      audio: [...new Uint8Array(audioBuffer)]
-    });
-    const timestamps = await findProfanityTimestamps(transcription, languages, env);
-    profanityResults = {
-      wordsRemoved: timestamps.length,
-      timestamps,
-      cleanTranscription: removeProfanityFromText(transcription.text, languages)
-    };
+    let transcription = null;
+    if (env.AI && typeof env.AI.run === 'function') {
+      // Cap payload for transcription to ~5MB to avoid memory-pressure errors on Workers AI
+      const TRANSCRIBE_CAP = 5 * 1024 * 1024;
+      const transBuf = audioBuffer.byteLength > TRANSCRIBE_CAP ? audioBuffer.slice(0, TRANSCRIBE_CAP) : audioBuffer;
+      const resp = await env.AI.run('@cf/openai/whisper', {
+        audio: [...new Uint8Array(transBuf)]
+      }).catch((e) => ({ error: e?.message || String(e) }));
+      if (resp && !resp.error) transcription = resp;
+      else console.warn('Whisper transcribe error:', resp?.error);
+    }
+
+    if (transcription && (transcription.text || transcription.segments)) {
+      const timestamps = await findProfanityTimestamps(transcription, languages, env);
+      profanityResults = {
+        wordsRemoved: timestamps.length,
+        timestamps,
+        cleanTranscription: removeProfanityFromText(transcription.text || '', languages)
+      };
+    } else {
+      // Graceful fallback if transcription unavailable
+      profanityResults = {
+        wordsRemoved: 0,
+        timestamps: [],
+        cleanTranscription: ''
+      };
+    }
   } catch (e) {
     console.warn('Profanity detection fallback:', e?.message);
-    profanityResults = {
-      wordsRemoved: Math.floor(Math.random() * 8) + 2,
-      timestamps: [],
-      cleanTranscription: 'Clean version processed'
-    };
+    profanityResults = { wordsRemoved: 0, timestamps: [], cleanTranscription: '' };
   }
 
   const previewDuration = planType === 'studio_elite' ? 60 : 30;
@@ -823,6 +888,7 @@ function removeProfanityFromText(text, languages) {
 }
 
 async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mime = 'audio/mpeg', originalName = 'track', request = null, resolvedBase = null) {
+  mime = mime || 'audio/mpeg';
   const watermarkId = generateWatermarkId(fingerprint);
 
   // Absolute base URL for signed links (always https, no trailing slash)
