@@ -215,6 +215,64 @@ export default {
           console.log('[ADMIN LOG]', body);
           return new Response('OK', { headers: corsHeaders });
         }
+
+        case '/ping-r2': {
+          if (!isAdminRequest(request, env)) {
+            return new Response('Forbidden', { status: 403, headers: corsHeaders });
+          }
+          try {
+            const hasR2 = Boolean(env.AUDIO_STORAGE);
+            let putOk = false, got = null;
+            if (hasR2) {
+              const key = '__health/ping.txt';
+              await env.AUDIO_STORAGE.put(key, 'ok', {
+                httpMetadata: { contentType: 'text/plain' }
+              });
+              putOk = true;
+              got = await env.AUDIO_STORAGE.get(key);
+            }
+            return new Response(JSON.stringify({
+              ok: true,
+              hasR2,
+              wrote: putOk,
+              read: Boolean(got),
+              size: got?.size ?? null
+            }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          } catch (e) {
+            return new Response(JSON.stringify({
+              ok: false,
+              error: e?.message || String(e)
+            }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+
+        case '/debug-audio': {
+          if (!isAdminRequest(request, env)) {
+            return new Response('Forbidden', { status: 403, headers: corsHeaders });
+          }
+          const q = new URL(request.url);
+          const key = q.searchParams.get('key') || '';
+          if (!key) {
+            return new Response(JSON.stringify({ error: 'Missing ?key=' }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          try {
+            const obj = await env.AUDIO_STORAGE?.get(key);
+            return new Response(JSON.stringify({
+              exists: Boolean(obj),
+              size: obj?.size || 0,
+              range: obj?.range || null,
+              httpMetadata: obj?.httpMetadata || null,
+              customMetadata: obj?.customMetadata || null
+            }, null, 2), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          } catch (e) {
+            return new Response(JSON.stringify({
+              exists: false,
+              error: e?.message || String(e)
+            }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
         default:
           return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
@@ -329,6 +387,12 @@ async function handleAudioDownload(request, env, corsHeaders) {
   const key = decodeURIComponent(url.pathname.replace(/^\/audio\//, ''));
   if (!key) return new Response('Bad Request', { status: 400, headers: corsHeaders });
 
+  if (!env.AUDIO_STORAGE) {
+    return new Response(JSON.stringify({ error: 'Storage not configured' }), {
+      status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   const exp = url.searchParams.get('exp');
   const sig = url.searchParams.get('sig');
   const ok = await verifySignedUrl(key, exp, sig, env);
@@ -419,6 +483,18 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     const planType = formData.get('planType') || 'free';
     const admin = isAdminRequest(request, env);
     const effectivePlan = admin ? 'studio_elite' : planType;
+
+    if (!env.AUDIO_STORAGE) {
+      const payload = {
+        success: false,
+        error: 'Storage not configured',
+        hint: 'Bind your R2 bucket as AUDIO_STORAGE in wrangler.toml and in the Dashboard.'
+      };
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
 
     if (!audioFile) {
       return new Response(JSON.stringify({ error: 'No audio file provided', hint: 'Send FormData with field name "audio".' }), {
