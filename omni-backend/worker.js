@@ -65,8 +65,10 @@ export default {
       'Access-Control-Allow-Origin': allowOrigin,
       'Vary': 'Origin',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature',
-      'Access-Control-Max-Age': '86400'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range',
+      'Access-Control-Max-Age': '86400',
+      // Expose streaming/seek headers so <audio> can read them
+      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length'
     };
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -227,7 +229,8 @@ async function handleAudioDownload(request, env, corsHeaders) {
     'Accept-Ranges': 'bytes',
     'Cache-Control': key.startsWith('previews/') ? 'public, max-age=3600' : 'private, max-age=7200'
   };
-  headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges';
+  headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges, Content-Length';
+  headers['Content-Disposition'] = key.startsWith('previews/') ? 'inline; filename="preview.mp3"' : 'inline; filename="full.mp3"';
 
   if (isPartial) {
     const start = r2Obj.range.offset;
@@ -235,9 +238,11 @@ async function handleAudioDownload(request, env, corsHeaders) {
     const end = start + length - 1;
     headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
     headers['Content-Length'] = String(length);
+    // Return with CORS + range headers so browsers can stream/seek audio across origins
     return new Response(r2Obj.body, { status: 206, headers });
   } else {
     headers['Content-Length'] = String(size);
+    // Return with CORS + range headers so browsers can stream/seek audio across origins
     return new Response(r2Obj.body, { status: 200, headers });
   }
 }
