@@ -679,6 +679,27 @@ const CONFIG = {
 };
 
 ///////////////////////
+// Ensure preview URLs are safe and usable from the site context
+function normalizePreviewUrl(url){
+  try{
+    if(!url) return url;
+    // If the URL is http while the page is https, upgrade to https to avoid mixed-content blocking
+    if(location.protocol === 'https:' && url.startsWith('http://')){
+      url = 'https://' + url.slice('http://'.length);
+    }
+    const u = new URL(url, location.href);
+    // If backend accidentally sent a localhost URL in production, try to swap host to our API base
+    const api = new URL(CONFIG.API_BASE_URL);
+    if((u.hostname === 'localhost' || u.hostname === '127.0.0.1') && api.hostname){
+      u.hostname = api.hostname;
+      u.protocol = api.protocol;
+      if(api.port) u.port = api.port; else u.port = '';
+    }
+    return u.toString();
+  }catch{ return url; }
+}
+
+///////////////////////
 // Simple Analytics
 ///////////////////////
 const ANALYTICS = {
@@ -885,6 +906,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   el.languagesDetected = document.getElementById('languagesDetected');
   el.pricing = document.getElementById('pricing');
 
+  // allow CORS audio and surface load errors
+  el.player.crossOrigin = 'anonymous';
+  el.player.addEventListener('loadedmetadata', ()=>{ el.player.style.display='block'; });
+  el.player.addEventListener('error', (e)=>{
+    console.error('Audio element error:', el.player.error, e);
+    showError('Preview failed to load (possible mixed content or CORS).');
+  });
+
   // listeners
   el.fileInput.addEventListener('change', onFileSelect);
   el.uploadArea.addEventListener('dragover', e=>{e.preventDefault(); el.uploadArea.classList.add('drag-over');});
@@ -971,8 +1000,10 @@ async function processFile(file){
     el.languagesDetected.textContent = Array.isArray(json.detectedLanguages) ? json.detectedLanguages.length : 1;
 
     // ready player
-    el.player.src = json.previewUrl;
-    el.player.style.display = 'block';
+    const safePreview = normalizePreviewUrl(json.previewUrl);
+    el.player.src = safePreview;
+    // ensure UI shows when media is actually ready (also handled in DOMContentLoaded listener)
+    if(el.player.readyState >= 1){ el.player.style.display = 'block'; }
 
     // finish progress & reveal player
     finishProgress().then(()=>completeProcessing());
@@ -984,7 +1015,7 @@ async function processFile(file){
     ANALYTICS.conversion('preview_completed', plan);
   }catch(err){
     console.error(err);
-    showError('⚠️ Audio processing failed. Please try again.');
+    showError('⚠️ Audio processed, but preview failed to load. Please try again or check CORS/mixed-content.');
     isProcessing=false;
     el.processing.style.display='none';
     document.querySelector('.upload-section').style.display='block';
