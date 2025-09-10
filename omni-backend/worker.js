@@ -47,6 +47,89 @@ export class ProcessingStateV2 {
   }
 }
 
+// ---------- Profanity detection (Trie over KV) ----------
+// Cache per-language tries so we only build once per Worker instance
+const PROF_CACHE = new Map(); // key: `lists/<lang>.json` -> { trie, words }
+
+async function getProfanityTrieFor(lang, env) {
+  const key = `lists/${lang}.json`;
+  if (PROF_CACHE.has(key)) return PROF_CACHE.get(key);
+
+  // Get JSON array of words for this language from KV
+  let words = await env.PROFANITY_LISTS?.get(key, { type: 'json' });
+  if (!Array.isArray(words)) words = [];
+
+  // Build Aho–Corasick trie at runtime (bundled via npm dep)
+  const { default: Aho } = await import('ahocorasick');
+  const builder = new Aho.Trie();
+  for (const w of words) {
+    if (w) builder.add(normalizeForProfanity(String(w)));
+  }
+  const trie = builder.build();
+  const pack = { trie, words };
+  PROF_CACHE.set(key, pack);
+  return pack;
+}
+
+function normalizeForProfanity(s = '') {
+  s = s.toLowerCase();
+  // strip diacritics
+  s = s.normalize('NFD').replace(/\p{Diacritic}+/gu, '');
+  // simple leetspeak & lookalikes
+  s = s
+    .replace(/[@₳Α]/g, 'a')
+    .replace(/[0оＯ〇º°]/g, 'o')
+    .replace(/[1l|！Ι]/g, 'i')
+    .replace(/\$/g, 's')
+    .replace(/[3Ɛ]/g, 'e')
+    .replace(/[7Ｔ]/g, 't')
+    .replace(/[5Ｓ]/g, 's')
+    .replace(/[¢ç]/g, 'c')
+    .replace(/[¡ɪ]/g, 'i')
+    .replace(/[ß]/g, 'ss');
+  // collapse 3+ repeats to 2
+  s = s.replace(/(.)\1{2,}/g, '$1$1');
+  // remove punctuation but keep spaces; collapse spaces
+  return s.replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
+async function matchProfanity(text, lang, env) {
+  const pack = await getProfanityTrieFor(lang, env);
+  const norm = normalizeForProfanity(text || '');
+  if (!pack.trie || !norm) return [];
+  const hits = [];
+  for (const h of pack.trie.find(norm)) {
+    for (const w of h.outputs) {
+      hits.push({ word: w, start: h.index - w.length + 1, end: h.index + 1 });
+    }
+  }
+  return dedupeOverlaps(hits);
+}
+
+function dedupeOverlaps(arr) {
+  arr.sort((a, b) => a.start - b.start || b.end - a.end);
+  const out = [];
+  let lastEnd = -1;
+  for (const m of arr) {
+    if (m.start >= lastEnd) { out.push(m); lastEnd = m.end; }
+  }
+  return out;
+}
+
+function normalizeLangs(langs = []) {
+  const map = {
+    english: 'en', spanish: 'es', french: 'fr', german: 'de', portuguese: 'pt',
+    italian: 'it', russian: 'ru', chinese: 'zh', arabic: 'ar', japanese: 'ja',
+    korean: 'ko', hindi: 'hi', turkish: 'tr', indonesian: 'id', swahili: 'sw',
+  };
+  const out = new Set();
+  for (const l of langs) {
+    const k = String(l || '').toLowerCase();
+    out.add(map[k] || k.slice(0, 2));
+  }
+  return [...out];
+}
+
 // Move export default outside the class
 export default {
   async fetch(request, env) {
@@ -76,6 +159,8 @@ export default {
 
     const url = new URL(request.url);
     const workerBase = getWorkerBase(env, request);
+
+
 
     // signed audio streaming
     if (url.pathname.startsWith('/audio/')) {
@@ -110,6 +195,7 @@ export default {
             has_R2: Boolean(env.AUDIO_STORAGE),
             has_DB: Boolean(env.DB),
             has_AI: Boolean(env.AI),
+            has_PROFANITY_KV: Boolean(env.PROFANITY_LISTS),
             workerBase: getWorkerBase(env, request),
           };
           return new Response(JSON.stringify(debug, null, 2), {
@@ -618,7 +704,7 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
     const transcription = await env.AI.run('@cf/openai/whisper', {
       audio: [...new Uint8Array(audioBuffer)]
     });
-    const timestamps = await findProfanityTimestamps(transcription, languages);
+    const timestamps = await findProfanityTimestamps(transcription, languages, env);
     profanityResults = {
       wordsRemoved: timestamps.length,
       timestamps,
@@ -688,25 +774,22 @@ function extractLanguagesFromTranscription(text = '') {
   return [...new Set(out)];
 }
 
-async function findProfanityTimestamps(transcription, languages) {
-  const profanityPatterns = {
-    english: /\b(fuck|shit|damn|hell|bitch|ass|crap|piss|cock|dick)\b/gi,
-    spanish: /\b(mierda|joder|coño|cabrón|puta|carajo|hostia|hijo de puta)\b/gi,
-    french: /\b(merde|putain|con|salope|connard|bordel|enculé)\b/gi,
-    german: /\b(scheiße|fick|arsch|verdammt|hurensohn|wichser)\b/gi,
-    italian: /\b(merda|cazzo|stronzo|puttana|figa|porco|vaffanculo)\b/gi,
-    portuguese: /\b(merda|caralho|porra|bosta|filho da puta|cu)\b/gi,
-  };
+async function findProfanityTimestamps(transcription, languages, env) {
   const ts = [];
-  if (transcription?.segments) {
-    for (const seg of transcription.segments) {
-      for (const [lang, pattern] of Object.entries(profanityPatterns)) {
-        if (languages.some(l => l.toLowerCase().includes(lang))) {
-          const matches = seg.text.match(pattern);
-          if (matches) {
-            ts.push({ start: seg.start, end: seg.end, word: matches[0], language: lang, confidence: seg.confidence ?? 0.8 });
-          }
-        }
+  if (!transcription?.segments?.length) return ts;
+  const langCodes = normalizeLangs(languages);
+
+  for (const seg of transcription.segments) {
+    for (const lc of langCodes) {
+      const matches = await matchProfanity(seg.text || '', lc, env);
+      for (const m of matches) {
+        ts.push({
+          start: seg.start,
+          end: seg.end,
+          word: m.word,
+          language: lc,
+          confidence: seg.confidence ?? 0.8
+        });
       }
     }
   }
