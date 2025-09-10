@@ -634,10 +634,19 @@
         © 2025 <span class="footer-brand">Fxckin With Everything Around - Intelligence</span>. All rights reserved.
       </div>
       <div id="admin-debug" style="display:none; margin-top:8px; font-size:0.85rem;">
-        <button id="debugBtn" style="padding:6px 10px; border-radius:8px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); cursor:pointer;">
-          🔎 Backend Debug
-        </button>
-        <span id="debugStatus" style="margin-left:8px; color:var(--text-secondary);"></span>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <label style="opacity:.8;">Admin:</label>
+          <input id="adminTokenInput" type="password" placeholder="API token" style="padding:6px 10px; border-radius:8px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); min-width:220px;" />
+          <button id="saveAdminTokenBtn" style="padding:6px 10px; border-radius:8px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); cursor:pointer;">Save token</button>
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+            <input id="adminModeToggle" type="checkbox" />
+            <span>Enable admin mode</span>
+          </label>
+          <button id="debugBtn" style="padding:6px 10px; border-radius:8px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); cursor:pointer;">
+            🔎 Backend Debug
+          </button>
+          <span id="debugStatus" style="margin-left:8px; color:var(--text-secondary);"></span>
+        </div>
       </div>
       <div style="color: var(--text-secondary); font-size: 0.75rem;">
         Professional audio cleaning technology • No refunds policy • Terms apply
@@ -695,7 +704,7 @@ function setAdminToken(tok){
 }
 function getAdminHeaders(){
   const tok = getAdminToken();
-  return tok ? { 'X-FWEA-Admin': tok } : {};
+  return tok ? { 'X-FWEA-Admin': tok, 'Authorization': `Bearer ${tok}` } : {};
 }
 
 ///////////////////////
@@ -1161,7 +1170,7 @@ window.purchaseStudioElite = purchaseStudioElite;
 function showPricingModal(){ document.getElementById('pricing').scrollIntoView({behavior:'smooth'}); ANALYTICS.conversion('pricing_viewed','free'); }
 function downloadPreview(){
   if(!window.__fweaPreviewUrl){ return showError('No preview available yet.'); }
-  const a = document.createElement('a'); a.href = window.__fweaPreviewUrl; a.download = (currentFile?.name || 'preview') + '.mp3'; document.body.appendChild(a); a.click(); a.remove();
+  const a = document.createElement('a'); a.href = normalizePreviewUrl(window.__fweaPreviewUrl); a.download = (currentFile?.name || 'preview') + '.mp3'; document.body.appendChild(a); a.click(); a.remove();
   showSuccess('Preview download started.'); ANALYTICS.conversion('preview_download','free');
 }
 window.showPricingModal = showPricingModal;
@@ -1181,34 +1190,74 @@ function notify(message, type){
 ///////////////////////
 // Admin mode flag
 ///////////////////////
-// Admin mode flag
+// Admin mode flag + controls
 (function checkAdmin(){
-  const isAdmin = location.search.includes('admin=true') || localStorage.getItem('fwea_admin')==='true';
-  if(isAdmin){
-    document.body.classList.add('admin-mode');
-    console.log('Admin mode active');
-    // ask once per session for the admin API token and cache it in sessionStorage
-    if(!getAdminToken()){
-      const tok = prompt('Enter admin API token');
-      if(tok) setAdminToken(tok);
+  const urlAdmin = location.search.includes('admin=true');
+  const savedAdmin = localStorage.getItem('fwea_admin') === 'true';
+  const isAdmin = urlAdmin || savedAdmin;
+
+  const dbg = document.getElementById('admin-debug');
+  const toggle = document.getElementById('adminModeToggle');
+  const tokenInput = document.getElementById('adminTokenInput');
+  const saveBtn = document.getElementById('saveAdminTokenBtn');
+  const btn = document.getElementById('debugBtn');
+  const out = document.getElementById('debugStatus');
+
+  if(dbg){ dbg.style.display = 'block'; }
+
+  // Initialize controls from storage
+  if(toggle){ toggle.checked = isAdmin; }
+  if(tokenInput){
+    try {
+      const existingTok = sessionStorage.getItem('FWEA_ADMIN_TOKEN') || '';
+      tokenInput.value = existingTok;
+    } catch {}
+  }
+
+  function applyAdminMode(enabled){
+    if(enabled){
+      document.body.classList.add('admin-mode');
+      console.log('Admin mode active');
+    } else {
+      document.body.classList.remove('admin-mode');
+      console.log('Admin mode off');
     }
   }
-    const dbg = document.getElementById('admin-debug');
-    if(dbg){
-      dbg.style.display = 'block';
-      const btn = document.getElementById('debugBtn');
-      const out = document.getElementById('debugStatus');
-      if(btn){
-        btn.onclick = async ()=>{
-          out.textContent = 'Checking backend…';
-          try{
-            const r = await fetch(`${CONFIG.API_BASE_URL}/debug-env`, { method:'GET', headers: { ...getAdminHeaders() } });
-            const j = await r.json();
-            out.textContent = (r.ok ? 'OK • ' : 'ERR • ') + `R2:${j.has_R2?'✅':'❌'} DB:${j.has_DB?'✅':'❌'} AI:${j.has_AI?'✅':'❌'} KV:${j.has_PROFANITY_KV?'✅':'❌'} BASE:${j.workerBase||'—'}`;
-          }catch(e){ out.textContent = 'Failed to reach backend.'; }
-        };
+
+  applyAdminMode(isAdmin);
+
+  if(toggle){
+    toggle.onchange = (e)=>{
+      const enabled = !!e.target.checked;
+      localStorage.setItem('fwea_admin', enabled ? 'true' : 'false');
+      applyAdminMode(enabled);
+    };
+  }
+
+  if(saveBtn){
+    saveBtn.onclick = ()=>{
+      const tok = (tokenInput?.value || '').trim();
+      if(tok){
+        setAdminToken(tok);
+        showSuccess('Admin token saved for this session.');
+      } else {
+        showWarning('Empty token — not saved.');
       }
-    }
+    };
+  }
+
+  if(btn){
+    btn.onclick = async ()=>{
+      if(out) out.textContent = 'Checking backend…';
+      try{
+        const r = await fetch(`${CONFIG.API_BASE_URL}/debug-env`, { method:'GET', headers: { ...getAdminHeaders() } });
+        const j = await r.json();
+        if(out) out.textContent = (r.ok ? 'OK • ' : 'ERR • ') + `R2:${j.has_R2?'✅':'❌'} DB:${j.has_DB?'✅':'❌'} AI:${j.has_AI?'✅':'❌'} KV:${j.has_PROFANITY_KV?'✅':'❌'} BASE:${j.workerBase||'—'}`;
+      }catch(e){ if(out) out.textContent = 'Failed to reach backend.'; }
+    };
+  }
+
+  // Allow ?api= override for quick testing
   try{
     const u = new URL(location.href);
     const override = u.searchParams.get('api');
@@ -1220,7 +1269,7 @@ function notify(message, type){
       }
     }
   }catch{}
-  // Optional: log presence of admin header/token
+
   console.log('Admin header present:', !!getAdminToken());
 })();
 
