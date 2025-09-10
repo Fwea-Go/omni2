@@ -3,98 +3,74 @@ main = "worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Development environment
-[env.development]
+# ---------- Shared vars for all envs (optional defaults) ----------
+[vars]
+ENVIRONMENT = "development"            # default; can be overridden below
+FRONTEND_URL = "http://localhost:3000" # default; overridden in production
 
-  ENVIRONMENT = "development"
-  FRONTEND_URL = "http://localhost:3000"
+# ---------- Development ----------
+[env.development.vars]
+ENVIRONMENT = "development"
+FRONTEND_URL = "http://localhost:3000"
 
-# Production environment  
-[env.production]
+# ---------- Production ----------
+[env.production.vars]
+ENVIRONMENT = "production"
+FRONTEND_URL = "https://omni2-8d2.pages.dev"   # no trailing slash
 
-  ENVIRONMENT = "production"
-  FRONTEND_URL = "https://omni2-8d2.pages.dev/"
+# ---- Secrets (set with wrangler secret put ... and per env) ----
+# STRIPE_SECRET_KEY
+# STRIPE_WEBHOOK_SECRET
+# OPENAI_API_KEY (optional)
 
-
-# Secrets (add these via wrangler secret put)
-# Required secrets to add manually:
-# wrangler secret put STRIPE_SECRET_KEY
-# wrangler secret put STRIPE_WEBHOOK_SECRET  
-# wrangler secret put OPENAI_API_KEY (optional)
-
-# D1 Database binding
+# ---- D1 Database binding ----
 [[d1_databases]]
 binding = "DB"
 database_name = "omnidb"
 database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
-preview_database_id = "your-preview-database-id-here"
+# If you don't have a preview DB yet, comment this out during dev:
+# preview_database_id = "your-preview-database-id-here"
 
-# R2 Storage binding for audio files
+# ---- R2 bucket for audio ----
 [[r2_buckets]]
 binding = "AUDIO_STORAGE"
 bucket_name = "fwea-audio-files"
-preview_bucket_name = "fwea-audio-files-preview"
+# preview_bucket_name must exist or omit during dev
+# preview_bucket_name = "fwea-audio-files-preview"
 
-# AI binding for Cloudflare Workers AI
+# ---- Workers AI binding ----
 [ai]
 binding = "AI"
 
-# KV binding for caching and rate limiting
+# ---- KV (optional) ----
 [[kv_namespaces]]
 binding = "CACHE"
 id = "427859929f0b4b63b3b1c1376eb5b798"
-preview_id = "your-preview-kv-namespace-id-here"
+# preview_id = "your-preview-kv-namespace-id-here"
 
-# Analytics Engine for usage tracking
+# ---- Analytics Engine ----
 [[analytics_engine_datasets]]
 binding = "ANALYTICS"
 dataset = "omni_analytics"
 
-# Queue binding for background processing
-# [queues]
-# binding = "AUDIO_QUEUE"
-# queue = "fwea-audio-processing"
-
-
-# Durable Objects for real-time features
+# ---- Durable Objects ----
 [[durable_objects.bindings]]
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["ProcessingStateV2"]
+new_classes = ["ProcessingStateV2"]   # << fix key here
 
-[migrations.sql]
-file = "migrations/v1.sql"
-
-
-
-# Worker configuration
+# ---- Build / triggers ----
 [build]
 command = ""
 
-# Resource limits (PAID)
-# [limits]
-# cpu_ms = 50000
-
-# Custom domains (uncomment and modify)
-# routes = [
-#   { pattern = "api.yourdomain.com/*", zone_name = "yourdomain.com" }
-# ]
-
-# Cron triggers for maintenance
 [triggers]
 crons = [
-  "0 2 * * *",               # every day at 2 AM UTC
-  "0 0 * * SUN"              # every Sunday at midnight UTC
+  "0 2 * * *",
+  "0 0 * * SUN"
 ]
 
-
-# Placement for optimal performance
 [placement]
 mode = "smart"
-
-# Browser rendering for advanced features (optional)
-# [browser]
-# binding = "BROWSER"
