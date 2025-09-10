@@ -102,6 +102,21 @@ export default {
           return handleEventTracking(request, env, corsHeaders);
         case '/health':
           return new Response('FWEA-I Backend Healthy', { headers: corsHeaders });
+        case '/debug-env': {
+          const debug = {
+            has_AUDIO_URL_SECRET: Boolean(env.AUDIO_URL_SECRET),
+            FRONTEND_URL: env.FRONTEND_URL || null,
+            WORKER_BASE_URL: env.WORKER_BASE_URL || null,
+            has_R2: Boolean(env.AUDIO_STORAGE),
+            has_DB: Boolean(env.DB),
+            has_AI: Boolean(env.AI),
+            workerBase: getWorkerBase(env, request),
+          };
+          return new Response(JSON.stringify(debug, null, 2), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
         default:
           return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
