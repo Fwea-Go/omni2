@@ -63,8 +63,10 @@ class_name = "ProcessingStateV2"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = [ "ProcessingStateV2" ]
+new_sqlite_classes = ["ProcessingStateV2"]
 
+[migrations.sql]
+file = "migrations/v1.sql"
 
 
 
