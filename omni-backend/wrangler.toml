@@ -12,7 +12,7 @@ WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # Default frontend (overridden below)
 FRONTEND_URL = "http://localhost:3000"
 # ADMIN_API_TOKEN is required for admin-only access to protected endpoints
-ADMIN_API_TOKEN = ""
+ADMIN_API_TOKEN = "changeme-admin-token"
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
@@ -73,7 +73,7 @@ ENVIRONMENT = "production"
 FRONTEND_URL = "https://fwea-i.com"   # live site origin (no trailing slash)
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # ADMIN_API_TOKEN is required for admin-only access to protected endpoints
-ADMIN_API_TOKEN = ""
+ADMIN_API_TOKEN = "changeme-admin-token"
 
 [env.production]
 # KV
