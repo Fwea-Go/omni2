@@ -17,6 +17,11 @@ FRONTEND_URL = "http://localhost:3000"
 binding = "CACHE"
 id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
+# ---- KV (Profanity Lists) ----
+[[kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "your-profanity-kv-id"
+
 # ---- D1 Database ----
 [[d1_databases]]
 binding = "DB"
@@ -71,6 +76,10 @@ WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 [[env.production.kv_namespaces]]
 binding = "CACHE"
 id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
+
+[[env.production.kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "your-profanity-kv-id"
 
 # D1
 [[env.production.d1_databases]]
