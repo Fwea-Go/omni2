@@ -18,7 +18,11 @@
     "secrets:list": "wrangler secret list",
     "tail": "wrangler tail",
     "kv:create": "wrangler kv:namespace create CACHE",
-    "kv:create:preview": "wrangler kv:namespace create CACHE --preview"
+    "kv:create:preview": "wrangler kv:namespace create CACHE --preview",
+    "deploy:staging": "wrangler deploy --env staging",
+    "kv:create:profanity": "wrangler kv:namespace create PROFANITY_LISTS",
+    "kv:seed:english": "wrangler kv:key put --binding=PROFANITY_LISTS lists/en.json --path=./wordlists/en.json --content-type application/json",
+    "kv:seed:spanish": "wrangler kv:key put --binding=PROFANITY_LISTS lists/es.json --path=./wordlists/es.json --content-type application/json"
   },
   "devDependencies": {
     "wrangler": "^4.35.0"
