@@ -7,6 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ENVIRONMENT = "development"            # default; can be overridden below
 FRONTEND_URL = "http://localhost:3000" # default; overridden in production
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 
 # ---------- Development ----------
 [env.development.vars]
@@ -22,6 +23,7 @@ FRONTEND_URL = "https://omni2-8d2.pages.dev"   # no trailing slash
 # STRIPE_SECRET_KEY
 # STRIPE_WEBHOOK_SECRET
 # OPENAI_API_KEY (optional)
+AUDIO_URL_SECRET
 
 # ---- D1 Database binding ----
 [[d1_databases]]
