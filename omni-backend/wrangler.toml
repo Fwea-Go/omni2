@@ -6,11 +6,15 @@ workers_dev = true
 
 # ---------- Shared defaults ----------
 [vars]
-ENVIRONMENT = "development"
-# Worker base (used to build signed audio URLs)
+ENVIRONMENT = "development"                       # default; overridden per-env below
+# Worker base (used to build signed audio URLs). Leave set to your worker host.
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # Default frontend (overridden below)
 FRONTEND_URL = "http://localhost:3000"
+# Optional: unsigned mode if not provided; worker will allow unsigned in dev
+AUDIO_URL_SECRET = ""
+# Admin header token for privileged endpoints (/debug-env, /__log)
+ADMIN_API_TOKEN = "CHANGE_ME_IN_SECRETS_OR_HERE"
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
@@ -20,7 +24,7 @@ id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 # ---- KV (Profanity Lists) ----
 [[kv_namespaces]]
 binding = "PROFANITY_LISTS"
-# TODO: replace with your real KV id (wrangler kv namespace list)
+# TODO: replace with real KV id
 id = "PROFANITY_LISTS_KV_ID_REPLACE_ME"
 
 # ---- D1 Database ----
@@ -60,27 +64,62 @@ command = ""
 [placement]
 mode = "smart"
 
-# ========== DEVELOPMENT ==========
+# ================== DEVELOPMENT ==================
+[env.development]
 [env.development.vars]
 ENVIRONMENT = "development"
 FRONTEND_URL = "http://localhost:3000"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+# In dev you can leave AUDIO_URL_SECRET blank for unsigned preview URLs
+AUDIO_URL_SECRET = ""
+# Use a dev token; put the real value with `wrangler secret put ADMIN_API_TOKEN`
+ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"
 
-[env.development.kv_namespaces]
+# KV (array tables!)
+[[env.development.kv_namespaces]]
 binding = "CACHE"
 id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
-[env.development.kv_namespaces]
+[[env.development.kv_namespaces]]
 binding = "PROFANITY_LISTS"
 id = "PROFANITY_LISTS_DEV_ID"
 
-# ========== PRODUCTION ==========
+# D1 (optional override if you use a dev DB)
+# [[env.development.d1_databases]]
+# binding = "DB"
+# database_name = "omnidb"
+# database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+
+# R2 (optional override if you use a dev bucket)
+# [[env.development.r2_buckets]]
+# binding = "AUDIO_STORAGE"
+# bucket_name = "fwea-audio-files"
+
+# AI
+[env.development.ai]
+binding = "AI"
+
+# Analytics
+[[env.development.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "omni_analytics"
+
+# DO binding mirrors root
+[[env.development.durable_objects.bindings]]
+name = "PROCESSING_STATE_V2"
+class_name = "ProcessingStateV2"
+
+# ================== PRODUCTION ==================
+[env.production]
 [env.production.vars]
 ENVIRONMENT = "production"
 FRONTEND_URL = "https://fwea-i.com"   # live site origin (no trailing slash)
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+# In prod you should set a real secret (or leave blank if you want unsigned)
+AUDIO_URL_SECRET = ""
+# Set via wrangler secret ideally
+ADMIN_API_TOKEN = "PROD_SET_VIA_SECRET"
 
-[env.production]
 # KV
 [[env.production.kv_namespaces]]
 binding = "CACHE"
