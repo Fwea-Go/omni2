@@ -1,91 +1,67 @@
-name = "omni2"
-main = "src/worker.js"
+name = "omnibackend2"
+main = "worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Development environment
-[env.development]
+# ---------- Shared vars (non-secret) ----------
+[vars]
+ENVIRONMENT = "development"
+FRONTEND_URL = "http://localhost:3000"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 
-  ENVIRONMENT = "development",
-  FRONTEND_URL = "http://localhost:3000"
+# ---------- Development ----------
+[env.development.vars]
+ENVIRONMENT = "development"
+FRONTEND_URL = "http://localhost:3000"
 
-# Production environment  
-[env.production]
+# ---------- Production ----------
+[env.production.vars]
+ENVIRONMENT = "production"
+FRONTEND_URL = "https://omni2-8d2.pages.dev"
 
-  ENVIRONMENT = "production",
-  FRONTEND_URL = "https://omni2-8d2.pages.dev/"
-
-
-# Secrets (add these via wrangler secret put)
-# Required secrets to add manually:
-# wrangler secret put STRIPE_SECRET_KEY
-# wrangler secret put STRIPE_WEBHOOK_SECRET  
-# wrangler secret put OPENAI_API_KEY (optional)
-
-# D1 Database binding
+# ---- D1 Database binding ----
 [[d1_databases]]
 binding = "DB"
-database_name = "fwea-database"
-database_id = "your-d1-database-id-here"
-preview_database_id = "your-preview-database-id-here"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+# preview_database_id = "..."
 
-# R2 Storage binding for audio files
+# ---- R2 bucket for audio ----
 [[r2_buckets]]
 binding = "AUDIO_STORAGE"
 bucket_name = "fwea-audio-files"
-preview_bucket_name = "fwea-audio-files-preview"
+# preview_bucket_name = "..."
 
-# AI binding for Cloudflare Workers AI
+# ---- Workers AI binding ----
 [ai]
 binding = "AI"
 
-# KV binding for caching and rate limiting
+# ---- KV (optional) ----
 [[kv_namespaces]]
 binding = "CACHE"
-id = "your-kv-namespace-id-here"
-preview_id = "your-preview-kv-namespace-id-here"
+id = "427859929f0b4b63b3b1c1376eb5b798"
+# preview_id = "..."
 
-# Analytics Engine for usage tracking
+# ---- Analytics Engine ----
 [[analytics_engine_datasets]]
 binding = "ANALYTICS"
-dataset = "fwea_analytics"
+dataset = "omni_analytics"
 
-# Queue binding for background processing
-[[queues]]
-binding = "AUDIO_QUEUE"
-queue = "fwea-audio-processing"
+# ---- Durable Objects ----
+# (Removed because the class is not defined in your code)
+# [[durable_objects.bindings]]
+# name = "PROCESSING_STATE_V2"
+# class_name = "ProcessingStateV2"
+# [[migrations]]
+# tag = "v1"
+# new_classes = ["ProcessingStateV2"]
 
-# Durable Objects for real-time features
-[[durable_objects.bindings]]
-name = "PROCESSING_STATE"
-class_name = "ProcessingState"
-
-# Worker configuration
+# ---- Build / triggers ----
 [build]
 command = ""
 
-# Resource limits
-[limits]
-cpu_ms = 50000
+[triggers]
+crons = ["0 2 * * *", "0 0 * * SUN"]
 
-# Custom domains (uncomment and modify)
-# routes = [
-#   { pattern = "api.yourdomain.com/*", zone_name = "yourdomain.com" }
-# ]
-
-# Cron triggers for maintenance
-[[triggers.crons]]
-cron = "0 2 * * *"  # Daily at 2 AM UTC
-name = "cleanup-expired-files"
-
-[[triggers.crons]] 
-cron = "0 0 * * SUN"  # Weekly on Sunday
-name = "generate-analytics-report"
-
-# Placement for optimal performance
 [placement]
 mode = "smart"
-
-# Browser rendering for advanced features (optional)
-# [browser]
-# binding = "BROWSER"
