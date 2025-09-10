@@ -8,6 +8,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "deploy:production": "wrangler deploy --env production",
+    "deploy:dev": "wrangler deploy --env development",
     "test": "wrangler dev --test",
     "db:create": "wrangler d1 create fwea-database",
     "db:init": "wrangler d1 execute fwea-database --file=schema.sql",
@@ -19,9 +20,8 @@
     "kv:create": "wrangler kv:namespace create CACHE",
     "kv:create:preview": "wrangler kv:namespace create CACHE --preview"
   },
-  "dependencies": {},
   "devDependencies": {
-    "wrangler": "^3.78.0"
+    "wrangler": "^4.35.0"
   },
   "keywords": [
     "audio",
@@ -37,6 +37,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/fwea-i-backend.git"
+    "url": "https://github.com/FweaGoJit/fwea-i-backend.git"
+  },
+  "dependencies": {
+    "stripe": "^18.5.0",
+    "ahocorasick": "^1.0.0"
   }
 }
