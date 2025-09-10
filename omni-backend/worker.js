@@ -468,8 +468,17 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     });
   } catch (error) {
     console.error('Audio processing error:', error);
-    return new Response(JSON.stringify({ error: 'Audio processing failed', details: error.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    // Never 500 here to avoid CORS/mixed-content confusion in the UI.
+    // Return a structured payload the frontend can surface as a banner.
+    const payload = {
+      success: false,
+      error: 'Audio processing failed',
+      details: (error && error.message) ? error.message : String(error || 'unknown'),
+      hint: 'If this persists, check R2 binding, AUDIO_URL_SECRET, and Workers AI availability.'
+    };
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
     });
   }
 }
