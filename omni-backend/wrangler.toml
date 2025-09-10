@@ -7,15 +7,15 @@ workers_dev = true
 # ---------- Shared defaults ----------
 [vars]
 ENVIRONMENT = "development"
-# Your worker base (used to build signed audio URLs)
+# Worker base (used to build signed audio URLs)
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# Default frontend (overridden in envs below)
+# Default frontend (overridden below)
 FRONTEND_URL = "http://localhost:3000"
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
 binding = "CACHE"
-id = "427859929f0b463bb13c1765ebb579b8"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
 # ---- D1 Database ----
 [[d1_databases]]
@@ -28,7 +28,6 @@ database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
 [[r2_buckets]]
 binding = "AUDIO_STORAGE"
 bucket_name = "fwea-audio-files"
-# preview_bucket_name = "fwea-audio-files-preview"  # optional
 
 # ---- Workers AI ----
 [ai]
@@ -53,7 +52,6 @@ new_classes = ["ProcessingStateV2"]
 [build]
 command = ""   # keep empty when deploying with `npx wrangler deploy`
 
-
 [placement]
 mode = "smart"
 
@@ -63,17 +61,12 @@ ENVIRONMENT = "development"
 FRONTEND_URL = "http://localhost:3000"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 
-# (Wrangler warns some bindings aren’t inherited; duplicating them is optional for dev)
-
 # ========== PRODUCTION ==========
 [env.production.vars]
 ENVIRONMENT = "production"
-# Your live site’s origin (no trailing slash). If you serve the app at /blank-4
-# that’s fine — set just the origin; the worker only needs the origin for CORS.
-FRONTEND_URL = "https://fwea-i.com"
+FRONTEND_URL = "https://fwea-i.com"   # your live site’s origin (no trailing slash)
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 
-# Duplicate non-inherited bindings to avoid warnings in prod:
 [env.production]
 # KV
 [[env.production.kv_namespaces]]
