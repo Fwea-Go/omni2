@@ -22,7 +22,6 @@ id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 binding = "DB"
 database_name = "omnidb"
 database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
-# preview_database_id = "..."  # optional
 
 # ---- R2 Bucket (audio) ----
 [[r2_buckets]]
@@ -43,14 +42,14 @@ dataset = "omni_analytics"
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
 
-# ---- Durable Object migrations ----
+# ---- Durable Object migrations (Free plan uses sqlite-backed DOs) ----
 [[migrations]]
 tag = "v1"
-new_classes = ["ProcessingStateV2"]
+new_sqlite_classes = ["ProcessingStateV2"]
 
 # ---- Build (let CLI handle bundling, incl. `stripe`) ----
 [build]
-command = ""   # keep empty when deploying with `npx wrangler deploy`
+command = ""
 
 [placement]
 mode = "smart"
@@ -64,7 +63,7 @@ WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # ========== PRODUCTION ==========
 [env.production.vars]
 ENVIRONMENT = "production"
-FRONTEND_URL = "https://fwea-i.com"   # your live site’s origin (no trailing slash)
+FRONTEND_URL = "https://fwea-i.com"   # live site origin (no trailing slash)
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 
 [env.production]
