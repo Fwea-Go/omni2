@@ -2,53 +2,37 @@ name = "omnibackend2"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
-# ---------- Shared vars for all envs (optional defaults) ----------
+# ---------- Shared defaults ----------
 [vars]
-ENVIRONMENT = "development"            # default; can be overridden below
-FRONTEND_URL = "http://localhost:3000" # default; overridden in production
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-
-# ---------- Development ----------
-[env.development.vars]
 ENVIRONMENT = "development"
+# Your worker base (used to build signed audio URLs)
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+# Default frontend (overridden in envs below)
 FRONTEND_URL = "http://localhost:3000"
 
-# ---------- Production ----------
-[env.production.vars]
-ENVIRONMENT = "production"
-FRONTEND_URL = "https://omni2-8d2.pages.dev"   # no trailing slash
+# ---- KV (Cache) ----
+[[kv_namespaces]]
+binding = "CACHE"
+id = "427859929f0b463bb13c1765ebb579b8"
 
-# ---- Secrets (set with wrangler secret put ... and per env) ----
-# STRIPE_SECRET_KEY
-# STRIPE_WEBHOOK_SECRET
-# OPENAI_API_KEY (optional)
-# AUDIO_URL_SECRET
-
-# ---- D1 Database binding ----
+# ---- D1 Database ----
 [[d1_databases]]
 binding = "DB"
 database_name = "omnidb"
 database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
-# If you don't have a preview DB yet, comment this out during dev:
-# preview_database_id = "your-preview-database-id-here"
+# preview_database_id = "..."  # optional
 
-# ---- R2 bucket for audio ----
+# ---- R2 Bucket (audio) ----
 [[r2_buckets]]
 binding = "AUDIO_STORAGE"
 bucket_name = "fwea-audio-files"
-# preview_bucket_name must exist or omit during dev
-# preview_bucket_name = "fwea-audio-files-preview"
+# preview_bucket_name = "fwea-audio-files-preview"  # optional
 
-# ---- Workers AI binding ----
+# ---- Workers AI ----
 [ai]
 binding = "AI"
-
-# ---- KV (optional) ----
-[[kv_namespaces]]
-binding = "CACHE"
-id = "427859929f0b4b63b3b1c1376eb5b798"
-# preview_id = "your-preview-kv-namespace-id-here"
 
 # ---- Analytics Engine ----
 [[analytics_engine_datasets]]
@@ -60,19 +44,66 @@ dataset = "omni_analytics"
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
 
+# ---- Durable Object migrations ----
 [[migrations]]
 tag = "v1"
-new_classes = ["ProcessingStateV2"]   # << fix key here
+new_classes = ["ProcessingStateV2"]
 
-# ---- Build / triggers ----
+# ---- Build (let CLI handle bundling, incl. `stripe`) ----
 [build]
-command = ""
+command = ""   # keep empty when deploying with `npx wrangler deploy`
 
+# ---- Cron triggers (keep under account limit) ----
 [triggers]
-crons = [
-  "0 2 * * *",
-  "0 0 * * SUN"
-]
+crons = ["0 2 * * *", "0 0 * * SUN"]
 
 [placement]
 mode = "smart"
+
+# ========== DEVELOPMENT ==========
+[env.development.vars]
+ENVIRONMENT = "development"
+FRONTEND_URL = "http://localhost:3000"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+
+# (Wrangler warns some bindings aren’t inherited; duplicating them is optional for dev)
+
+# ========== PRODUCTION ==========
+[env.production.vars]
+ENVIRONMENT = "production"
+# Your live site’s origin (no trailing slash). If you serve the app at /blank-4
+# that’s fine — set just the origin; the worker only needs the origin for CORS.
+FRONTEND_URL = "https://fwea-i.com"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+
+# Duplicate non-inherited bindings to avoid warnings in prod:
+[env.production]
+# KV
+[[env.production.kv_namespaces]]
+binding = "CACHE"
+id = "427859929f0b463bb13c1765ebb579b8"
+
+# D1
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+
+# R2
+[[env.production.r2_buckets]]
+binding = "AUDIO_STORAGE"
+bucket_name = "fwea-audio-files"
+
+# AI
+[env.production.ai]
+binding = "AI"
+
+# Analytics
+[[env.production.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "omni_analytics"
+
+# Durable Objects
+[[env.production.durable_objects.bindings]]
+name = "PROCESSING_STATE_V2"
+class_name = "ProcessingStateV2"
