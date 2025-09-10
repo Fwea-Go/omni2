@@ -151,7 +151,9 @@ export default {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin',
       'Access-Control-Max-Age': '86400',
       // Expose streaming/seek headers so <audio> can read them
-      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length'
+      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Timing-Allow-Origin': '*'
     };
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -826,14 +828,31 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   // Absolute base URL for signed links (always https, no trailing slash)
   const base = (resolvedBase && resolvedBase.trim()) || getWorkerBase(env, request);
 
-  // Preview (simple truncate; placeholder math)
-  const previewBytes = Math.min(audioBuffer.byteLength, previewDuration * 44100 * 2);
-  const previewBuffer = audioBuffer.slice(0, previewBytes);
-  const watermarkedPreview = await addAudioWatermark(previewBuffer, watermarkId);
+  // Preview: store original bytes as-is to ensure a valid playable file.
+  // We enforce "previewing" on the frontend by stopping playback at `previewDuration`.
+  // Using the original MIME avoids mixed/mismatched codec issues.
+  const watermarkedPreview = await addAudioWatermark(audioBuffer, watermarkId);
 
-  const previewKey = `previews/${generateProcessId()}_preview.mp3`;
+  // Pick an extension that matches the incoming MIME (fallback to .bin)
+  const extByMime = {
+    'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+    'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
+    'audio/flac': 'flac',
+    'audio/x-flac': 'flac',
+    'audio/ogg': 'ogg',
+    'audio/opus': 'opus',
+    'audio/webm': 'webm',
+    'audio/mp4': 'm4a',
+    'audio/aac': 'aac',
+    'audio/x-aac': 'aac'
+  };
+  const guessedExt = extByMime[mime] || (String(originalName).split('.').pop() || 'bin');
+  const previewKey = `previews/${generateProcessId()}_preview.${guessedExt}`;
+
   await env.AUDIO_STORAGE.put(previewKey, watermarkedPreview, {
-    httpMetadata: { contentType: 'audio/mpeg', cacheControl: 'public, max-age=3600' },
+    httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'public, max-age=3600' },
     customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
   });
 
@@ -846,15 +865,18 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
     const processedAudio = await processFullAudio(audioBuffer, profanityResults, planType);
     const watermarkedFull = await addAudioWatermark(processedAudio, watermarkId);
 
-    const fullKey = `full/${generateProcessId()}_full.mp3`;
+    const fullKey = `full/${generateProcessId()}_full.${guessedExt}`;
     await env.AUDIO_STORAGE.put(fullKey, watermarkedFull, {
-      httpMetadata: { contentType: 'audio/mpeg', cacheControl: 'private, max-age=7200' },
+      httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'private, max-age=7200' },
       customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
     });
 
     const { exp: fexp, sig: fsig } = await signR2Key(fullKey, env, 60 * 60);
     fullAudioUrl = `${base}/audio/${encodeURIComponent(fullKey)}?exp=${fexp}&sig=${fsig}`;
   }
+
+  // Log the generated URLs for debugging
+  console.log('Generated URLs', { previewUrl, fullAudioUrl, base });
 
   return {
     previewUrl,
