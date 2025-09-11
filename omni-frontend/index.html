@@ -550,7 +550,7 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 56px;
+            height: 48px;
             background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
             overflow: hidden;
@@ -587,7 +587,7 @@
         /* Footer */
         footer {
             margin-top: 2rem;
-            padding: 1rem 0 56px 0; /* tighter gap above language banner */
+            padding: 0.5rem 0 48px 0; /* even tighter gap above language banner */
             border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
 
@@ -602,6 +602,9 @@
         .footer-text {
             opacity: 0.8;
             text-align: center;
+            background: linear-gradient(90deg, #00f5ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .admin-access {
@@ -949,8 +952,8 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-text">
-                    <p style="opacity: 0.8; margin-bottom: 1rem;">
-                        © 2025 Fxckin With Everything Around - Intelligence. All rights reserved.
+                    <p class="footer-colored" style="opacity: 0.9; margin-bottom: 1rem; font-weight: 600;">
+                        © 2025 Fxckin With Everything Around - <span style="background: linear-gradient(90deg, #00f5ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Intelligence</span>. All rights reserved.
                     </p>
                     <p style="opacity: 0.6; font-size: 0.9rem;">
                         Professional audio cleaning technology • No refunds policy • Terms apply
