@@ -166,8 +166,8 @@ export default {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
       'Access-Control-Max-Age': '86400',
-      // Expose streaming/seek headers so &lt;audio&gt; can read them
-      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type',
+      // Expose streaming/seek headers so <audio> can read them
+      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified',
       'Cross-Origin-Resource-Policy': 'cross-origin',
       'Timing-Allow-Origin': '*'
     };
@@ -181,9 +181,6 @@ export default {
     }
 
     const url = new URL(request.url);
-    const workerBase = getWorkerBase(env, request);
-
-
 
     // signed audio streaming
     if (url.pathname.startsWith('/audio/')) {
@@ -210,31 +207,8 @@ export default {
           return handleEventTracking(request, env, corsHeaders);
         case '/health':
           return new Response('FWEA-I Backend Healthy', { headers: corsHeaders });
-        case '/debug-env': {
-          if (!isAdminRequest(request, env)) {
-            return new Response('Forbidden', { status: 403, headers: corsHeaders });
-          }
-          const debug = {
-            has_AUDIO_URL_SECRET: Boolean(env.AUDIO_URL_SECRET),
-            FRONTEND_URL: env.FRONTEND_URL || null,
-            WORKER_BASE_URL: env.WORKER_BASE_URL || null,
-            has_R2: Boolean(env.AUDIO_STORAGE),
-            has_DB: Boolean(env.DB),
-            has_AI: Boolean(env.AI),
-            has_PROFANITY_KV: Boolean(env.PROFANITY_LISTS),
-            workerBase: getWorkerBase(env, request),
-          };
-          return new Response(JSON.stringify(debug, null, 2), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-        case '/__log': {
-          if (!isAdminRequest(request, env)) return new Response('Forbidden', { status: 403, headers: corsHeaders });
-          const body = await request.text();
-          console.log('[ADMIN LOG]', body);
-          return new Response('OK', { headers: corsHeaders });
-        }
+
+        // NEW: helpers to check R2 & sign files (kept from your version) …
 
         case '/ping-r2': {
           if (!isAdminRequest(request, env)) {
@@ -308,10 +282,10 @@ export default {
           try {
             const { exp, sig } = await signR2Key(key, env, 15 * 60);
             const base = getWorkerBase(env, request);
-            const url = sig
+            const url2 = sig
               ? `${base}/audio/${encodeURIComponent(key)}?exp=${exp}&sig=${sig}`
               : `${base}/audio/${encodeURIComponent(key)}`;
-            return new Response(JSON.stringify({ url, exp, sig }), {
+            return new Response(JSON.stringify({ url: url2, exp, sig }), {
               status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
@@ -322,6 +296,80 @@ export default {
             });
           }
         }
+
+        // NEW: post-payment redemption (download gated by active sub)
+        case '/redeem-download': {
+          const u = new URL(request.url);
+          const sessionId = u.searchParams.get('session_id') || '';
+          const processId = u.searchParams.get('process_id') || '';
+          if (!env.DB || !sessionId) {
+            return new Response('Missing session_id or DB not configured', { status: 400, headers: corsHeaders });
+          }
+          try {
+            const row = await env.DB.prepare(`SELECT user_id, plan_type, is_active FROM user_subscriptions WHERE stripe_session_id = ?`).bind(sessionId).first();
+            if (!row || !row.is_active) return new Response('Subscription not active', { status: 403, headers: corsHeaders });
+            const hist = processId
+              ? await env.DB.prepare(`SELECT result FROM processing_history WHERE process_id = ? LIMIT 1`).bind(processId).first()
+              : await env.DB.prepare(`SELECT result FROM processing_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`).bind(row.user_id).first();
+            if (!hist) return new Response('No processed audio found', { status: 404, headers: corsHeaders });
+            const result = JSON.parse(hist.result || '{}');
+            const fullUrl = result.fullAudioUrl;
+            if (!fullUrl) return new Response('Full audio not available', { status: 404, headers: corsHeaders });
+            return Response.redirect(fullUrl, 302);
+          } catch {
+            return new Response('Redeem failed', { status: 500, headers: corsHeaders });
+          }
+        }
+        case '/download-page': {
+          const u = new URL(request.url);
+          const sessionId = u.searchParams.get('session_id') || '';
+          const processId = u.searchParams.get('process_id') || '';
+          if (!env.DB || !sessionId) {
+            return new Response('Missing session_id or DB not configured', { status: 400, headers: corsHeaders });
+          }
+          try {
+            const row = await env.DB.prepare(`SELECT user_id, plan_type, is_active FROM user_subscriptions WHERE stripe_session_id = ?`).bind(sessionId).first();
+            if (!row || !row.is_active) return new Response('Subscription not active', { status: 403, headers: corsHeaders });
+            const hist = processId
+              ? await env.DB.prepare(`SELECT result FROM processing_history WHERE process_id = ? LIMIT 1`).bind(processId).first()
+              : await env.DB.prepare(`SELECT result FROM processing_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`).bind(row.user_id).first();
+            if (!hist) return new Response('No processed audio found', { status: 404, headers: corsHeaders });
+            const result = JSON.parse(hist.result || '{}');
+            const fullUrl = result.fullAudioUrl;
+            if (!fullUrl) return new Response('Full audio not available', { status: 404, headers: corsHeaders });
+            const html = `<!doctype html><meta charset="utf-8"><title>Your Download</title><style>body{font-family:system-ui;padding:24px;line-height:1.45}a{font-size:18px}</style><h1>Ready to download</h1><p>Your clean track is ready.</p><p><a href="${fullUrl}">Download clean version</a></p>`;
+            return new Response(html, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } });
+          } catch {
+            return new Response('Download page failed', { status: 500, headers: corsHeaders });
+          }
+        }
+
+        case '/debug-env': {
+          if (!isAdminRequest(request, env)) {
+            return new Response('Forbidden', { status: 403, headers: corsHeaders });
+          }
+          const debug = {
+            has_AUDIO_URL_SECRET: Boolean(env.AUDIO_URL_SECRET),
+            FRONTEND_URL: env.FRONTEND_URL || null,
+            WORKER_BASE_URL: env.WORKER_BASE_URL || null,
+            has_R2: Boolean(env.AUDIO_STORAGE),
+            has_DB: Boolean(env.DB),
+            has_AI: Boolean(env.AI),
+            has_PROFANITY_KV: Boolean(env.PROFANITY_LISTS),
+            workerBase: getWorkerBase(env, request),
+          };
+          return new Response(JSON.stringify(debug, null, 2), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        case '/__log': {
+          if (!isAdminRequest(request, env)) return new Response('Forbidden', { status: 403, headers: corsHeaders });
+          const body = await request.text();
+          console.log('[ADMIN LOG]', body);
+          return new Response('OK', { headers: corsHeaders });
+        }
+
         default:
           return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
@@ -464,6 +512,9 @@ async function handleAudioDownload(request, env, corsHeaders) {
   if (!r2Obj) r2Obj = await env.AUDIO_STORAGE.get(key);
   if (!r2Obj) return new Response('Not found', { status: 404, headers: corsHeaders });
 
+  // Surface preview/profanity metadata to clients
+  const meta = r2Obj?.customMetadata || {};
+
   const isPartial = Boolean(r2Obj.range);
   const size = r2Obj.size;
   const mime = (r2Obj.httpMetadata && r2Obj.httpMetadata.contentType) || 'audio/mpeg';
@@ -473,10 +524,19 @@ async function handleAudioDownload(request, env, corsHeaders) {
     'Accept-Ranges': 'bytes',
     'Cache-Control': key.startsWith('previews/') ? 'public, max-age=3600' : 'private, max-age=7200'
   };
-  headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type';
+  headers['Access-Control-Expose-Headers'] =
+    (headers['Access-Control-Expose-Headers'] || 'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified') +
+    ', X-Preview-Limit-Ms, X-Profanity';
+
+  if (meta && meta.previewMs) headers['X-Preview-Limit-Ms'] = meta.previewMs;
+  if (meta && meta.profanity) headers['X-Profanity'] = meta.profanity;
+
   // Set ETag header if available
   const etag = r2Obj?.httpEtag || r2Obj?.etag || null;
   if (etag) headers['ETag'] = etag;
+  // Set Last-Modified header if available
+  const lastMod = r2Obj?.uploaded || r2Obj?.httpMetadata?.lastModified || null;
+  if (lastMod) headers['Last-Modified'] = new Date(lastMod).toUTCString();
   headers['Content-Disposition'] = key.startsWith('previews/') ? 'inline; filename="preview.mp3"' : 'inline; filename="full.mp3"';
   // Harden MIME guard: fallback to audio/mpeg if missing or not audio
   if (!headers['Content-Type'] || !String(headers['Content-Type']).startsWith('audio/')) {
@@ -489,15 +549,11 @@ async function handleAudioDownload(request, env, corsHeaders) {
     const end = start + length - 1;
     headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
     headers['Content-Length'] = String(length);
-    // Ensure Accept-Ranges is always present
     headers['Accept-Ranges'] = 'bytes';
-    // Return with CORS + range headers so browsers can stream/seek audio across origins
     return new Response(r2Obj.body, { status: 206, headers });
   } else {
     headers['Content-Length'] = String(size);
-    // Ensure Accept-Ranges is always present
     headers['Accept-Ranges'] = 'bytes';
-    // Return with CORS + range headers so browsers can stream/seek audio across origins
     return new Response(r2Obj.body, { status: 200, headers });
   }
 }
@@ -550,7 +606,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     }
 
     if (!audioFile) {
-      return new Response(JSON.stringify({ error: 'No audio file provided', hint: 'Send FormData with field name "audio".' }), {
+      return new Response(JSON.stringify({ error: 'No audio file provided', hint: 'Send FormData with field name \"audio\".' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -581,24 +637,18 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     // AI processing
     const processingResult = await processAudioWithAI(audioFile, effectivePlan, fingerprint, env, request, getWorkerBase(env, request));
 
-    // Defensive check for URLs
     if (!processingResult.previewUrl) {
       console.warn('No previewUrl generated; check R2 binding and AUDIO_URL_SECRET');
     }
 
-    // Persist & analytics
     await storeProcessingResult(fingerprint, processingResult, env, planType);
     await updateUsageStats(fingerprint, planType, audioFile.size, env);
 
-    // IMPORTANT: Frontend expects these exact fields:
-    // success, previewUrl, fullAudioUrl, detectedLanguages[], wordsRemoved, previewDuration
     return new Response(JSON.stringify({ success: true, ...processingResult }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('Audio processing error:', error);
-    // Never 500 here to avoid CORS/mixed-content confusion in the UI.
-    // Return a structured payload the frontend can surface as a banner.
     const payload = {
       success: false,
       error: 'Audio processing failed',
@@ -755,6 +805,12 @@ async function handleStripeWebhook(request, env, corsHeaders) {
 async function handleAccessActivation(request, env, corsHeaders) {
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
+    if (!env.DB) {
+      return new Response(JSON.stringify({ success: false, error: 'db_not_configured' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     const { fingerprint, plan, sessionId, email } = await request.json();
     await env.DB.prepare(`
       INSERT OR REPLACE INTO user_subscriptions 
@@ -775,6 +831,12 @@ async function handleAccessActivation(request, env, corsHeaders) {
 async function handleSubscriptionValidation(request, env, corsHeaders) {
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
+    if (!env.DB) {
+      return new Response(JSON.stringify({ valid: false, reason: 'db_not_configured' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     const { fingerprint, sessionId, plan } = await request.json();
     const result = await env.DB.prepare(`
       SELECT * FROM user_subscriptions 
@@ -800,6 +862,12 @@ async function handleSubscriptionValidation(request, env, corsHeaders) {
 async function handleSendVerification(request, env, corsHeaders) {
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
+    if (!env.DB) {
+      return new Response(JSON.stringify({ success: false, error: 'db_not_configured' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     const { email, plan } = await request.json();
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     await env.DB.prepare(`
@@ -818,6 +886,12 @@ async function handleSendVerification(request, env, corsHeaders) {
 async function handleEmailVerification(request, env, corsHeaders) {
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
+    if (!env.DB) {
+      return new Response(JSON.stringify({ valid: false, reason: 'db_not_configured' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     const { email, code, plan } = await request.json();
     const result = await env.DB.prepare(`
       SELECT * FROM verification_codes 
@@ -838,7 +912,10 @@ async function handleEmailVerification(request, env, corsHeaders) {
 async function handleEventTracking(request, env, corsHeaders) {
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
-    // Frontend may not send fingerprint/planType — make these optional
+    if (!env.DB) {
+      // Soft-success when analytics storage is unavailable
+      return new Response(JSON.stringify({ success: true, note: 'analytics_disabled' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const eventData = await request.json();
     await env.DB.prepare(`
       INSERT INTO usage_analytics 
@@ -850,7 +927,6 @@ async function handleEventTracking(request, env, corsHeaders) {
       eventData.planType || 'free',
       eventData.value || null,
       eventData.userAgent || '',
-      // Trust CF-Connecting-IP (no PII persisted beyond basic IP string)
       request.headers.get('CF-Connecting-IP') || '',
       Date.now()
     ).run();
@@ -893,7 +969,7 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
     };
   }
 
-  // Language detection (best-effort; guarantees an array so the UI shows chips)
+  // Language detection (best-effort)
   let languages = ['English'];
   try {
     if (env.AI && typeof env.AI.run === 'function') {
@@ -910,8 +986,6 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
       } else {
         console.warn('Whisper sniff error:', resp?.error);
       }
-    } else {
-      console.warn('env.AI missing; skipping language detection');
     }
   } catch (e) {
     console.warn('Language detection fallback:', e?.message);
@@ -922,7 +996,6 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
   try {
     let transcription = null;
     if (env.AI && typeof env.AI.run === 'function') {
-      // Cap payload for transcription to ~5MB to avoid memory-pressure errors on Workers AI
       const TRANSCRIBE_CAP = 5 * 1024 * 1024;
       const transBuf = audioBuffer.byteLength > TRANSCRIBE_CAP ? audioBuffer.slice(0, TRANSCRIBE_CAP) : audioBuffer;
       let resp;
@@ -943,12 +1016,7 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
         cleanTranscription: removeProfanityFromText(transcription.text || '', languages)
       };
     } else {
-      // Graceful fallback if transcription unavailable
-      profanityResults = {
-        wordsRemoved: 0,
-        timestamps: [],
-        cleanTranscription: ''
-      };
+      profanityResults = { wordsRemoved: 0, timestamps: [], cleanTranscription: '' };
     }
   } catch (e) {
     console.warn('Profanity detection fallback:', e?.message);
@@ -956,9 +1024,8 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
   }
 
   const previewDuration = planType === 'studio_elite' ? 60 : 30;
-  // Generate streaming URLs (R2). If this fails, do NOT 500 —
-  // fall back to a graceful result so the UI can show an error
-  // banner but keep the page flow alive.
+
+  // Generate streaming URLs (R2)
   let audioResults = {
     previewUrl: null,
     fullAudioUrl: null,
@@ -984,14 +1051,15 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
 
   return {
     processId: generateProcessId(),
-    detectedLanguages: languages,                // <-- UI reads this
-    wordsRemoved: profanityResults.wordsRemoved, // <-- UI reads this
+    detectedLanguages: languages,
+    wordsRemoved: profanityResults.wordsRemoved,
     profanityTimestamps: profanityResults.timestamps,
+    cleanTranscription: profanityResults.cleanTranscription,
     originalDuration: Math.floor(audioBuffer.byteLength / 44100), // placeholder seconds
     processedDuration: audioResults.processedDuration,
-    previewUrl: audioResults.previewUrl,        // <-- UI reads this
+    previewUrl: audioResults.previewUrl,
     previewDuration,
-    fullAudioUrl: audioResults.fullAudioUrl,    // <-- UI reads this (null for free)
+    fullAudioUrl: audioResults.fullAudioUrl,
     quality: getQualityForPlan(planType),
     processingTime: Date.now(),
     watermarkId: audioResults.watermarkId,
@@ -1049,8 +1117,12 @@ function removeProfanityFromText(text, languages) {
   return (text || '').replace(/\b(fuck|shit|damn|hell|bitch|ass|crap|piss)\b/gi, '[CLEANED]');
 }
 
+/* =========================
+   PREVIEW/TRIMMING + FULL OUTPUT
+   ========================= */
+
 async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mime = 'audio/mpeg', originalName = 'track', request = null, resolvedBase = null) {
-  // Robust MIME guard: ensure a playable audio content-type
+  // Robust MIME guard
   const extFromName = (String(originalName||'').split('.').pop()||'').toLowerCase();
   const mimeByExt = {
     mp3:'audio/mpeg', wav:'audio/wav', flac:'audio/flac', ogg:'audio/ogg', opus:'audio/opus', webm:'audio/webm', m4a:'audio/mp4', aac:'audio/aac'
@@ -1060,15 +1132,12 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   }
   const watermarkId = generateWatermarkId(fingerprint);
 
-  // Absolute base URL for signed links (always https, no trailing slash)
+  // Absolute base URL for signed links
   const base = (resolvedBase && resolvedBase.trim()) || getWorkerBase(env, request);
 
-  // Preview: store original bytes as-is to ensure a valid playable file.
-  // We enforce "previewing" on the frontend by stopping playback at `previewDuration`.
-  // Using the original MIME avoids mixed/mismatched codec issues.
+  // (A) PREVIEW: watermark + hard-cut to exact previewDuration (bytes approximation by bitrate)
   const watermarkedPreview = await addAudioWatermark(audioBuffer, watermarkId);
 
-  // Pick an extension that matches the incoming MIME (fallback to .bin)
   const extByMime = {
     'audio/mpeg': 'mp3',
     'audio/mpeg3': 'mp3',
@@ -1087,10 +1156,23 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   const guessedExt = extByMime[mime] || (String(originalName).split('.').pop() || 'bin');
   const previewKey = `previews/${generateProcessId()}_preview.${guessedExt}`;
 
+  // hard-cut preview: approximate bytes from plan bitrate
+  const bitrateStr = getBitrateForPlan('free');
+  const bps = bytesPerSecondFromBitrate(bitrateStr);
+  const capBytes = Math.min(audioBuffer.byteLength, Math.max(1, previewDuration * bps));
+  const previewSlice = watermarkedPreview.slice(0, capBytes);
+
   try {
-    await env.AUDIO_STORAGE.put(previewKey, watermarkedPreview, {
+    await env.AUDIO_STORAGE.put(previewKey, previewSlice, {
       httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'public, max-age=3600' },
-      customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
+      customMetadata: {
+        plan: planType,
+        watermarkId,
+        fingerprint,
+        originalName,
+        previewMs: String(previewDuration * 1000),
+        profanity: JSON.stringify(profanityResults && profanityResults.timestamps ? profanityResults.timestamps : [])
+      }
     });
   } catch (e) {
     console.warn('R2 put preview failed:', e?.message || e);
@@ -1101,7 +1183,7 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
     ? `${base}/audio/${encodeURIComponent(previewKey)}?exp=${pexp}&sig=${psig}`
     : `${base}/audio/${encodeURIComponent(previewKey)}`;
 
-  // Full (only for non-free)
+  // (B) FULL (only for non-free): mute profanity in WAV; passthrough other codecs
   let fullAudioUrl = null;
   if (planType !== 'free') {
     const processedAudio = await processFullAudio(audioBuffer, profanityResults, planType);
@@ -1123,20 +1205,92 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
       : `${base}/audio/${encodeURIComponent(fullKey)}`;
   }
 
-  // Log the generated URLs for debugging
   console.log('Generated URLs', { previewUrl, fullAudioUrl, base });
 
   return {
     previewUrl,
     fullAudioUrl,
-    processedDuration: Math.max(0, Math.floor(audioBuffer.byteLength / 44100) - 2),
+    processedDuration: Math.max(0, Math.min(Math.floor(audioBuffer.byteLength / 44100) - 2, Math.floor((previewDuration || 0)))),
     watermarkId
   };
 }
 
 async function processFullAudio(audioBuffer, profanityResults, planType) {
-  // TODO: real DSP—mute/bleep/replace segments, EQ, loudness, etc.
-  return audioBuffer;
+  // Best-effort server-side mute for WAV/PCM only; passthrough for compressed formats.
+  try {
+    if (!audioBuffer || audioBuffer.byteLength < 44) return audioBuffer;
+    const dv = new DataView(audioBuffer);
+    // Check RIFF/WAVE header
+    if (dv.getUint32(0, false) !== 0x52494646 /* 'RIFF' */ || dv.getUint32(8, false) !== 0x57415645 /* 'WAVE' */) {
+      return audioBuffer; // unsupported container
+    }
+    // Locate 'fmt ' chunk
+    let offset = 12; let fmtOffset = -1, fmtSize = 0;
+    while (offset + 8 <= dv.byteLength) {
+      const id = dv.getUint32(offset, false);
+      const sz = dv.getUint32(offset + 4, true);
+      if (id === 0x666d7420 /* 'fmt ' */) { fmtOffset = offset + 8; fmtSize = sz; break; }
+      offset += 8 + sz + (sz & 1);
+    }
+    if (fmtOffset < 0) return audioBuffer;
+    const audioFormat = dv.getUint16(fmtOffset + 0, true); // 1 = PCM, 3 = IEEE float
+    const numChannels = dv.getUint16(fmtOffset + 2, true);
+    const sampleRate = dv.getUint32(fmtOffset + 4, true);
+    const bitsPerSample = dv.getUint16(fmtOffset + 14, true);
+    if (!sampleRate || !numChannels || (audioFormat !== 1 && audioFormat !== 3)) return audioBuffer;
+
+    // Find 'data' chunk
+    offset = fmtOffset + fmtSize; let dataOffset = -1, dataSize = 0;
+    while (offset + 8 <= dv.byteLength) {
+      const id = dv.getUint32(offset, false);
+      const sz = dv.getUint32(offset + 4, true);
+      if (id === 0x64617461 /* 'data' */) { dataOffset = offset + 8; dataSize = sz; break; }
+      offset += 8 + sz + (sz & 1);
+    }
+    if (dataOffset < 0 || dataOffset + dataSize > dv.byteLength) return audioBuffer;
+
+    const bytesPerSample = bitsPerSample / 8;
+    const frameSize = bytesPerSample * numChannels;
+    const dataEnd = dataOffset + dataSize;
+
+    const silenceWindow = (startSec, endSec) => {
+      const startIdx = Math.max(0, Math.floor(startSec * sampleRate));
+      const endIdx = Math.max(startIdx, Math.floor(endSec * sampleRate));
+      for (let i = startIdx; i < endIdx; i++) {
+        const byteIndex = dataOffset + i * frameSize;
+        if (byteIndex + frameSize > dataEnd) break;
+        if (audioFormat === 1) {
+          // PCM int
+          for (let ch = 0; ch < numChannels; ch++) {
+            const p = byteIndex + ch * bytesPerSample;
+            if (bitsPerSample === 16) dv.setInt16(p, 0, true);
+            else if (bitsPerSample === 24) { dv.setInt8(p + 0, 0); dv.setInt8(p + 1, 0); dv.setInt8(p + 2, 0); }
+            else if (bitsPerSample === 32) dv.setInt32(p, 0, true);
+            else dv.setInt8(p, 0);
+          }
+        } else if (audioFormat === 3) {
+          // IEEE float
+          for (let ch = 0; ch < numChannels; ch++) {
+            const p = byteIndex + ch * bytesPerSample;
+            if (bitsPerSample === 32) dv.setFloat32(p, 0, true);
+            else if (bitsPerSample === 64) dv.setFloat64(p, 0, true);
+          }
+        }
+      }
+    };
+
+    const windows = (profanityResults && Array.isArray(profanityResults.timestamps)) ? profanityResults.timestamps : [];
+    for (const w of windows) {
+      if (Number.isFinite(w.start) && Number.isFinite(w.end)) {
+        const pad = 0.05; // 50ms padding to avoid clicks
+        silenceWindow(Math.max(0, w.start - pad), w.end + pad);
+      }
+    }
+    return audioBuffer;
+  } catch (e) {
+    console.warn('processFullAudio mute failed:', e?.message || e);
+    return audioBuffer;
+  }
 }
 
 async function addAudioWatermark(audioBuffer, watermarkId) {
@@ -1166,6 +1320,14 @@ function getBitrateForPlan(plan) {
   return bitrates[plan] || '128kbps';
 }
 
+function bytesPerSecondFromBitrate(bitrateStr) {
+  // bitrateStr like '128kbps', '256kbps', '320kbps'
+  const m = /([0-9]+)\\s*k?b\\s*p\\s*s/i.exec(String(bitrateStr || ''));
+  const kbps = m ? parseInt(m[1], 10) : 128;
+  // kbps -> bytes/s
+  return Math.max(1, Math.floor((kbps * 1000) / 8));
+}
+
 /* =========================
    Persistence helpers
    ========================= */
@@ -1173,6 +1335,9 @@ function getBitrateForPlan(plan) {
 async function validateUserAccess(fingerprint, planType, env, request) {
   if (isAdminRequest(request, env)) return { valid: true, reason: 'admin' };
   if (planType === 'free') return { valid: true, reason: 'free_tier' };
+  if (!env.DB) {
+    return { valid: false, reason: 'db_not_configured' };
+  }
   try {
     const result = await env.DB.prepare(`
       SELECT * FROM user_subscriptions 
@@ -1191,6 +1356,7 @@ async function validateUserAccess(fingerprint, planType, env, request) {
 }
 
 async function storeProcessingResult(fingerprint, result, env, planType) {
+  if (!env.DB) return;
   try {
     await env.DB.prepare(`
       INSERT INTO processing_history 
@@ -1216,6 +1382,7 @@ async function storeProcessingResult(fingerprint, result, env, planType) {
 }
 
 async function updateUsageStats(fingerprint, planType, fileSize, env) {
+  if (!env.DB) return;
   try {
     await env.DB.prepare(`
       INSERT INTO usage_analytics 
@@ -1228,6 +1395,7 @@ async function updateUsageStats(fingerprint, planType, fileSize, env) {
 }
 
 async function storePaymentIntent(sessionId, type, priceId, fingerprint, env) {
+  if (!env.DB) return;
   try {
     await env.DB.prepare(`
       INSERT INTO payment_transactions 
@@ -1249,6 +1417,7 @@ async function storePaymentIntent(sessionId, type, priceId, fingerprint, env) {
 }
 
 async function handlePaymentSuccess(session, env) {
+  if (!env.DB) return;
   const { type, fingerprint } = session.metadata || {};
   const email = session.customer_email;
   const stripeSubscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
@@ -1274,6 +1443,8 @@ async function handlePaymentSuccess(session, env) {
     email
   ).run();
 
+  // Hint for frontend where to send the user
+  console.log(`Redeem URL: /download-page?session_id=${encodeURIComponent(session.id)}`);
   console.log(`Payment successful: ${type} for ${email || fingerprint}`);
 }
 
@@ -1282,6 +1453,7 @@ async function handleSubscriptionRenewal(invoice, env) {
 }
 
 async function handleSubscriptionCancelled(subscription, env) {
+  if (!env.DB) return;
   await env.DB.prepare(`
     UPDATE user_subscriptions 
     SET is_active = 0, updated_at = ?
