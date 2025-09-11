@@ -178,60 +178,59 @@ export default {
 async function route(request, env, ctx) {
   const url = new URL(request.url);
 
-  // CORS
-const allowList = [
-  // env vars (trim any trailing slash)
-  env.FRONTEND_URL && env.FRONTEND_URL.replace(/\/+$/, ''),
-  env.WIX_SITE_URL && env.WIX_SITE_URL.replace(/\/+$/, ''),
+  // CORS allow-list
+  const allowList = [
+    env.FRONTEND_URL && env.FRONTEND_URL.replace(/\/+$/, ''),
+    env.WIX_SITE_URL && env.WIX_SITE_URL.replace(/\/+$/, ''),
+    'https://omni2-8d2.pages.dev',
+    'https://fwea-i.com',
+    'https://www.fwea-i.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ].filter(Boolean);
 
-  // explicit origins you’re using
-  'https://omni2-8d2.pages.dev',
-  'https://fwea-i.com',
-  'https://www.fwea-i.com',
-
-  // local dev
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-].filter(Boolean);
-
-const reqOrigin  = request.headers.get('Origin') || '';
-const allowOrigin = allowList.includes(reqOrigin) ? reqOrigin : '';
-const cors = {
-  'Access-Control-Allow-Origin': allowOrigin || '*',
-  'Vary': 'Origin',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
-  'Access-Control-Expose-Headers':
-    'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified',
-  'Access-Control-Max-Age': '86400',
-};
+  const reqOrigin   = request.headers.get('Origin') || '';
+  const allowOrigin = allowList.includes(reqOrigin) ? reqOrigin : '';
+  const cors = {
+    'Access-Control-Allow-Origin': allowOrigin || '*',
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
+    'Access-Control-Expose-Headers':
+      'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified',
+    'Access-Control-Max-Age': '86400',
   };
 
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  // Preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
+  }
 
-  // Static audio streaming via signed path
-  if (url.pathname.startsWith("/audio/")) return handleAudioDownload(request, env, cors);
+  // Signed audio streaming
+  if (url.pathname.startsWith('/audio/')) {
+    return handleAudioDownload(request, env, cors);
+  }
 
   // Routes
   try {
     switch (url.pathname) {
-      case "/transcribe":             return await handleTranscribe(request, env, cors);
-      case "/process-audio":          return await handleAudioProcessing(request, env, cors);
-      case "/create-payment":         return await handlePaymentCreation(request, env, cors);
-      case "/webhook":                return await handleStripeWebhook(request, env, cors);
-      case "/activate-access":        return await handleAccessActivation(request, env, cors);
-      case "/validate-subscription":  return j({ valid: true }, 200, cors);
-      case "/send-verification":      return j({ success: true }, 200, cors);
-      case "/verify-email-code":      return j({ valid: true }, 200, cors);
-      case "/track-event":            return j({ success: true }, 200, cors);
-      case "/redeem-download":        return await handleRedeemDownload(request, env, cors);
-      case "/download-page":          return await handleDownloadPage(request, env, cors);
-      case "/debug-env":              return j({ ok: true, envKeys: Object.keys(env) }, 200, cors);
-      case "/health":
+      case '/transcribe':            return await handleTranscribe(request, env, cors);
+      case '/process-audio':         return await handleAudioProcessing(request, env, cors);
+      case '/create-payment':        return await handlePaymentCreation(request, env, cors);
+      case '/webhook':               return await handleStripeWebhook(request, env, cors);
+      case '/activate-access':       return await handleAccessActivation(request, env, cors);
+      case '/validate-subscription': return j({ valid: true }, 200, cors);
+      case '/send-verification':     return j({ success: true }, 200, cors);
+      case '/verify-email-code':     return j({ valid: true }, 200, cors);
+      case '/track-event':           return j({ success: true }, 200, cors);
+      case '/redeem-download':       return await handleRedeemDownload(request, env, cors);
+      case '/download-page':         return await handleDownloadPage(request, env, cors);
+      case '/debug-env':             return j({ ok: true, envKeys: Object.keys(env) }, 200, cors);
+      case '/health':
         return j({
-          status: "healthy",
-          version: "2.1.1",
+          status: 'healthy',
+          version: '2.1.1',
           timestamp: Date.now(),
           services: {
             r2: Boolean(env.AUDIO_STORAGE),
@@ -239,16 +238,17 @@ const cors = {
             ai: Boolean(env.AI),
             profanity_lists: Boolean(env.PROFANITY_LISTS),
             stripe: Boolean(env.STRIPE_SECRET_KEY),
-            transcriber_cfg: Boolean(env.TRANSCRIBE_ENDPOINT)
-          }
+            transcriber_cfg: Boolean(env.TRANSCRIBE_ENDPOINT),
+          },
         }, 200, cors);
       default:
-        return new Response("Not Found", { status: 404, headers: cors });
+        return new Response('Not Found', { status: 404, headers: cors });
     }
   } catch (err) {
-    console.error("Route error:", err);
-    return j({ error: "Internal Server Error", details: String(err?.message || err) }, 500, cors);
+    console.error('Route error:', err);
+    return j({ error: 'Internal Server Error', details: String(err?.message || err) }, 500, cors);
   }
+}
 
 
 // ---------- Handlers ----------
