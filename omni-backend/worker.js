@@ -249,7 +249,7 @@ const cors = {
     console.error("Route error:", err);
     return j({ error: "Internal Server Error", details: String(err?.message || err) }, 500, cors);
   }
-}
+
 
 // ---------- Handlers ----------
 async function handleTranscribe(request, env, cors) {
