@@ -406,13 +406,9 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
   try {
     const audioBuffer = await audioFile.arrayBuffer();
 
-    // (Mock) transcription — plug in your real model here (or call /transcribe route)
-    const transcription = {
-      text: "This is a sample transcription with some inappropriate content",
-      language: 'en',
-      segments: [{ start: 0, end: 30, text: "This is a sample transcription with some inappropriate content", confidence: 0.9 }]
-    };
-
+    
+// NEW (real)
+    const transcription = await callTranscriberWithFile(audioFile, env);
     const detectedLanguages = extractLanguagesFromTranscription(transcription.text);
     const normalizedLanguages = normalizeLangs(detectedLanguages);
 
