@@ -1034,27 +1034,7 @@
         </div>
     </div>
 
-    <script>
-        
-        // Configuration
-     
-  // Optionally define window.FWEA_API_BASE *before* this block in prod/staging:
-  // <script>window.FWEA_API_BASE="https://api.fwea-i.com"
-
-  const CONFIG = {
-    API_BASE: window.FWEA_API_BASE || "https://omnibackend2.fweago-flavaz.workers.dev",
-    SUPPORTED_FORMATS: ['audio/mpeg','audio/wav','audio/flac','audio/m4a','audio/aac','audio/ogg'],
-    MAX_FILE_SIZE: {
-      free: 50 * 1024 * 1024,
-      single_track: 100 * 1024 * 1024,
-      day_pass: 100 * 1024 * 1024,
-      dj_pro: 200 * 1024 * 1024,
-      studio_elite: 500 * 1024 * 1024
-    },
-    PREVIEW_DURATION: {
-      free: 30, single_track: 45, day_pass: 45, dj_pro: 45, studio_elite: 60
-    }
-  };
+  
     
 <script>
   // --- Configuration (override in HTML head with window.FWEA_API_BASE if needed) ---
