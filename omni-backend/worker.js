@@ -147,7 +147,7 @@ function dedupeOverlaps(arr){arr.sort((a,b)=>a.start-b.start||b.end-a.end);const
 function normalizeLangs(langs=[]){const map={english:'en',spanish:'es',french:'fr',german:'de',portuguese:'pt',italian:'it',russian:'ru',chinese:'zh',arabic:'ar',japanese:'ja',korean:'ko',hindi:'hi',turkish:'tr',indonesian:'id',swahili:'sw'};const out=new Set();for(const l of langs){const k=String(l||'').toLowerCase();out.add(map[k]||k.slice(0,2))}return[...out]}
 
 // ---------- Main Worker ----------
-export default {
+
   async fetch(request, env) {
     // CORS
     const reqOrigin = request.headers.get('Origin') || '';
