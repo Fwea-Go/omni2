@@ -136,26 +136,46 @@ export default {
     // ---------- CORS (echo only if origin is in allowlist) ----------
     const reqOrigin = request.headers.get('Origin') || '';
     const workerOrigin = new URL(request.url).origin;
+
+    // Normalize configured frontend (strip trailing slash)
+    const configuredFrontend = (env.FRONTEND_URL || '').replace(/\/+$/, '');
+
+    // Allowlist plus pattern-matches for Pages previews and prod domains
     const allowList = [
-      (env.FRONTEND_URL || '').replace(/\/+$/, ''),
+      configuredFrontend,
       workerOrigin,
+      'https://fwea-i.com',
+      'https://www.fwea-i.com',
       'http://localhost:3000',
       'http://127.0.0.1:3000'
     ].filter(Boolean);
 
-    const allowOrigin = allowList.includes(reqOrigin) ? reqOrigin : '*';
-    const corsHeaders = {
+    // Accept reqOrigin if it matches the allowList OR known patterns (*.pages.dev)
+    const pagesDevPattern = /^https:\/\/[a-z0-9-]+\.pages\.dev$/i;
+    const isAllowed =
+      allowList.includes(reqOrigin) ||
+      pagesDevPattern.test(reqOrigin);
+
+    // If we can positively echo the origin, do it; otherwise fall back to worker origin (NOT "*")
+    const allowOrigin = isAllowed && reqOrigin ? reqOrigin : workerOrigin;
+
+    // Only advertise credentials support when we're echoing a concrete origin
+    const baseCors = {
       'Access-Control-Allow-Origin': allowOrigin,
       'Vary': 'Origin',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
       'Access-Control-Max-Age': '86400',
-      'Access-Control-Allow-Credentials': 'true',
-      // Expose streaming/seek headers so <audio> can read them
+      // Expose streaming/seek headers so &lt;audio&gt; can read them
       'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
       'Cross-Origin-Resource-Policy': 'cross-origin',
       'Timing-Allow-Origin': '*'
     };
+    // Conditionally add credentials header (illegal with "*" / opaque origins)
+    const corsHeaders = allowOrigin === workerOrigin
+      ? baseCors
+      : { ...baseCors, 'Access-Control-Allow-Credentials': 'true' };
+
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
