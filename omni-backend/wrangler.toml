@@ -1,9 +1,9 @@
 # FWEA-I Cloudflare Worker Configuration
 # This file configures the deployment settings for your audio cleaning service
 
-name = "fwea-i-backend"
+name = "omnibackend2"
 main = "worker.js"
-compatibility_date = "2024-12-10"
+compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Worker settings
@@ -13,7 +13,7 @@ route = { pattern = "api.fwea-i.com/*", zone_name = "fwea-i.com" }
 # Durable Objects
 [durable_objects]
 bindings = [
-  { name = "PROCESSING_STATE", class_name = "ProcessingStateV2" }
+  { name = "PROCESSING_STATE_V2", class_name = "ProcessingStateV2" }
 ]
 
 [[migrations]]
@@ -23,21 +23,31 @@ new_classes = ["ProcessingStateV2"]
 # R2 Storage for audio files
 [[r2_buckets]]
 binding = "AUDIO_STORAGE"
-bucket_name = "fwea-i-audio-files"
-preview_bucket_name = "fwea-i-audio-files-preview"
+bucket_name = "fwea-audio-files"
+preview_bucket_name = "fwea-audio-files"
 
 # D1 Database for user data and analytics
 [[d1_databases]]
 binding = "DB"
-database_name = "fwea-i-production"
-database_id = "your-database-id-here"
-preview_database_id = "your-preview-database-id-here"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+preview_database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
 
 # KV Storage for profanity lists and caching
 [[kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "your-profanity-kv-id-here"
-preview_id = "your-profanity-kv-preview-id-here"
+id = "PROFANITY_LISTS_PROD_ID"
+preview_id = "PROFANITY_LISTS_PROD_ID"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
+preview_id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
+
+# Analytics Engine Datasets
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "omni_analytics"
 
 # Workers AI binding
 [ai]
@@ -50,63 +60,79 @@ queue_name = "audio-processing"
 
 # Environment variables (secrets managed via dashboard/CLI)
 [vars]
-FRONTEND_URL = "https://fwea-i.com"
-WORKER_BASE_URL = "https://api.fwea-i.com"
+FRONTEND_URL = "http://localhost:3000"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+ENVIRONMENT = "production"
 
 # Development environment
 [env.development]
-name = "fwea-i-backend-dev"
+name = "omnibackend2-dev"
 workers_dev = true
 
 [env.development.vars]
 FRONTEND_URL = "http://localhost:3000"
 WORKER_BASE_URL = "http://localhost:8787"
+ENVIRONMENT = "development"
 
 # R2 buckets for development
 [[env.development.r2_buckets]]
 binding = "AUDIO_STORAGE"
-bucket_name = "fwea-i-audio-files-dev"
+bucket_name = "fwea-audio-files"
 
 # D1 database for development
 [[env.development.d1_databases]]
 binding = "DB"
-database_name = "fwea-i-development"
-database_id = "your-dev-database-id-here"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
 
 # KV namespace for development
 [[env.development.kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "your-dev-profanity-kv-id-here"
+id = "PROFANITY_LISTS_PROD_ID"
+
+[[env.development.kv_namespaces]]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
 # Staging environment
 [env.staging]
-name = "fwea-i-backend-staging"
+name = "omnibackend2-staging"
 route = { pattern = "staging-api.fwea-i.com/*", zone_name = "fwea-i.com" }
 
 [env.staging.vars]
 FRONTEND_URL = "https://staging.fwea-i.com"
 WORKER_BASE_URL = "https://staging-api.fwea-i.com"
+ENVIRONMENT = "staging"
 
 # R2 buckets for staging
 [[env.staging.r2_buckets]]
 binding = "AUDIO_STORAGE"
-bucket_name = "fwea-i-audio-files-staging"
+bucket_name = "fwea-audio-files"
 
 # D1 database for staging
 [[env.staging.d1_databases]]
 binding = "DB"
-database_name = "fwea-i-staging"
-database_id = "your-staging-database-id-here"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
 
 # KV namespace for staging
 [[env.staging.kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "your-staging-profanity-kv-id-here"
+id = "PROFANITY_LISTS_PROD_ID"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
 # Production environment (inherits top-level settings)
 [env.production]
-name = "fwea-i-backend-prod"
+name = "omnibackend2-prod"
 route = { pattern = "api.fwea-i.com/*", zone_name = "fwea-i.com" }
+
+[env.production.vars]
+FRONTEND_URL = "http://localhost:3000"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+ENVIRONMENT = "production"
 
 # Build configuration
 [build]
