@@ -434,7 +434,7 @@ async function handlePaymentCreation(request, env, corsHeaders) {
       quality: getQualityForPlan(planType),
       watermarkId: audioOutputs.watermarkId
     };
-  } catch (error) {
+   catch (error) {
     console.error('AI processing error:', error);
     return { success:false, error:'AI processing failed', details:error.message };
   }
