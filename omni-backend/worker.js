@@ -1,4 +1,4 @@
-// FWEA-I Backend — Cloudflare Worker (End-to-End)
+// FWEA-I Backend — Cloudflare Worker (End-to-End, aligned+consolidated)
 
 // ---------- Imports ----------
 import Stripe from 'stripe';
@@ -10,7 +10,6 @@ export class ProcessingStateV2 {
     this.env = env;
     this.cache = new Map();
   }
-
   async fetch(request) {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
@@ -46,9 +45,14 @@ export class ProcessingStateV2 {
 
 // ---------- Small state helpers (use DO as a lightweight KV) ----------
 async function getProcessingStub(env, name = 'global') {
-  if (!env?.PROCESSING_STATE) return null;
-  try { const id = env.PROCESSING_STATE.idFromName(name); return env.PROCESSING_STATE.get(id); }
-  catch { return null; }
+  // FIX: use correct binding name from wrangler.toml
+  if (!env?.PROCESSING_STATE_V2) return null;
+  try {
+    const id = env.PROCESSING_STATE_V2.idFromName(name);
+    return env.PROCESSING_STATE_V2.get(id);
+  } catch {
+    return null;
+  }
 }
 async function putStateKV(env, key, value) {
   const stub = await getProcessingStub(env);
@@ -71,14 +75,16 @@ function json(body, status = 200, corsHeaders = {}) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-// ---------- Enhanced Profanity Detection (unchanged core) ----------
+// ---------- Enhanced Profanity Detection ----------
 const PROF_CACHE = new Map();
 async function getProfanityTrieFor(lang, env) {
   const key = `lists/${lang}.json`;
   if (PROF_CACHE.has(key)) return PROF_CACHE.get(key);
   let words = await env.PROFANITY_LISTS?.get(key, { type: 'json' });
   if (!Array.isArray(words)) words = [];
-  const patterns = words.map(word => ({ original: word, normalized: normalizeForProfanity(String(word)) })).filter(p => p.normalized.length > 0);
+  const patterns = words
+    .map(word => ({ original: word, normalized: normalizeForProfanity(String(word)) }))
+    .filter(p => p.normalized.length > 0);
   const pack = { patterns, words };
   PROF_CACHE.set(key, pack);
   return pack;
@@ -148,6 +154,7 @@ export default {
 
     try {
       switch (url.pathname) {
+        case '/transcribe':               return await handleTranscribe(request, env, corsHeaders);
         case '/process-audio':            return await handleAudioProcessing(request, env, corsHeaders);
         case '/create-payment':           return await handlePaymentCreation(request, env, corsHeaders);
         case '/webhook':                  return await handleStripeWebhook(request, env, corsHeaders);
@@ -161,14 +168,15 @@ export default {
         case '/health':
           return json({
             status: 'healthy',
-            version: '2.1.0',
+            version: '2.1.1',
             timestamp: Date.now(),
             services: {
               r2: Boolean(env.AUDIO_STORAGE),
               database: Boolean(env.DB),
               ai: Boolean(env.AI),
               profanity_lists: Boolean(env.PROFANITY_LISTS),
-              stripe: Boolean(env.STRIPE_SECRET_KEY)
+              stripe: Boolean(env.STRIPE_SECRET_KEY),
+              transcriber_cfg: Boolean(env.TRANSCRIBE_ENDPOINT)
             }
           }, 200, corsHeaders);
         default:
@@ -195,6 +203,53 @@ const PRICE_BY_TYPE = {
   studio_elite: STRIPE_PRICE_IDS.STUDIO_ELITE,
 };
 
+// ---------- /transcribe (proxy to RunPod FastAPI) ----------
+async function handleTranscribe(request, env, corsHeaders) {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
+  if (!env.TRANSCRIBE_ENDPOINT) return json({ error: 'TRANSCRIBE_ENDPOINT not configured' }, 500, corsHeaders);
+
+  try {
+    const ct = request.headers.get('content-type') || '';
+    let resp;
+
+    // Pass through multipart directly (file upload)
+    if (ct.includes('multipart/form-data')) {
+      const fd = await request.formData();
+      // (optional) allow overrides via query/form: model / compute
+      if (!fd.get('model') && env.ASR_MODEL) fd.set('model', env.ASR_MODEL);
+      if (!fd.get('compute') && env.ASR_COMPUTE) fd.set('compute', env.ASR_COMPUTE);
+
+      resp = await fetch(env.TRANSCRIBE_ENDPOINT.replace(/\/+$/,'') + '/transcribe', {
+        method: 'POST',
+        body: fd,
+        headers: {
+          // Forward auth token in a simple custom header (match FastAPI expectation)
+          'X-API-Token': env.TRANSCRIBE_TOKEN || '',
+        }
+      });
+    } else {
+      // JSON body with { url: "https://..." } or similar
+      const body = await request.json().catch(() => ({}));
+      resp = await fetch(env.TRANSCRIBE_ENDPOINT.replace(/\/+$/,'') + '/transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Token': env.TRANSCRIBE_TOKEN || '',
+        },
+        body: JSON.stringify(body),
+      });
+    }
+
+    // Bubble up response
+    const outCT = resp.headers.get('content-type') || 'application/json';
+    const buf = await resp.arrayBuffer();
+    return new Response(buf, { status: resp.status, headers: { ...corsHeaders, 'Content-Type': outCT } });
+  } catch (e) {
+    console.error('Transcribe proxy error:', e);
+    return json({ error: 'Transcription proxy failed', details: e.message }, 502, corsHeaders);
+  }
+}
+
 // ---------- /process-audio ----------
 async function handleAudioProcessing(request, env, corsHeaders) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
@@ -208,7 +263,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     const effectivePlan = admin ? 'studio_elite' : planType;
 
     if (!env.AUDIO_STORAGE) return json({ success:false, error:'Storage not configured', hint:'Bind R2 bucket' }, 503, corsHeaders);
-    if (!audioFile)        return json({ success:false, error:'No audio file provided', hint:'Send FormData field \"audio\"' }, 400, corsHeaders);
+    if (!audioFile)        return json({ success:false, error:'No audio file provided', hint:'Send FormData field "audio"' }, 400, corsHeaders);
 
     const maxSizes = { free: 50*1024*1024, single_track: 100*1024*1024, day_pass: 100*1024*1024, dj_pro: 200*1024*1024, studio_elite: 500*1024*1024 };
     const maxSize = maxSizes[effectivePlan] || maxSizes.free;
@@ -226,7 +281,7 @@ async function handleAudioProcessing(request, env, corsHeaders) {
     return json({ success: true, ...processingResult }, 200, corsHeaders);
   } catch (error) {
     console.error('Audio processing error:', error);
-    return json({ success:false, error:'Audio processing failed', details: error.message }, 500, corsHeaders);
+    return json({ success:false, error:'Audio processing failed', details:error.message }, 500, corsHeaders);
   }
 }
 
@@ -256,7 +311,7 @@ async function handlePaymentCreation(request, env, corsHeaders) {
       allow_promotion_codes: true,
       automatic_tax: { enabled: true },
       customer_creation: 'if_required',
-      payment_method_types: ['card', 'link'], // Enable Link by Stripe
+      payment_method_types: ['card', 'link'],
       metadata: {
         type: type || '',
         fileName: fileName || '',
@@ -280,7 +335,7 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
   try {
     const audioBuffer = await audioFile.arrayBuffer();
 
-    // (Mock) transcription — plug in your real model here
+    // (Mock) transcription — plug in your real model here (or call /transcribe route)
     const transcription = {
       text: "This is a sample transcription with some inappropriate content",
       language: 'en',
@@ -344,7 +399,7 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
 
   // preview
   const previewKey = `previews/${processId}_preview.mp3`;
-  const approxBytes = Math.min(audioBuffer.byteLength, previewDuration * 44100 * 2); // rough
+  const approxBytes = Math.min(audioBuffer.byteLength, previewDuration * 44100 * 2);
   const previewSlice = audioBuffer.slice(0, approxBytes);
   try {
     await env.AUDIO_STORAGE.put(previewKey, previewSlice, {
@@ -400,7 +455,7 @@ async function hmacSHA256(message, secret) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  const b64 = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   return b64;
 }
 async function signR2Key(key, env, ttlSeconds = 15 * 60) {
@@ -447,7 +502,7 @@ async function handleAudioDownload(request, env, corsHeaders) {
 // ---------- Stripe webhook (ack only; add DB logic if needed) ----------
 async function handleStripeWebhook(request, env, corsHeaders) {
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
-  const sig = request.headers.get('Stripe-Signature'); // present when configured
+  const sig = request.headers.get('Stripe-Signature');
   const secret = env.STRIPE_WEBHOOK_SECRET;
   if (!secret) return new Response('OK', { status: 200, headers: corsHeaders });
   try {
@@ -460,7 +515,7 @@ async function handleStripeWebhook(request, env, corsHeaders) {
   }
 }
 
-// ---------- /activate-access (verify Checkout session and return signed full URL) ----------
+// ---------- /activate-access ----------
 async function handleAccessActivation(request, env, corsHeaders) {
   try {
     const { fingerprint, sessionId } = await request.json();
@@ -530,4 +585,3 @@ async function handleDownloadPage(request, env, corsHeaders) {
 async function storeProcessingResult(){/* optional: your DB */}
 async function updateUsageStats(){/* optional: your DB */}
 async function storePaymentIntent(){/* optional: your DB */}
-// Note: basic durability for last processed file is handled by PROCESSING_STATE DO.
