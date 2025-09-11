@@ -44,10 +44,10 @@ dataset = "omni_analytics"
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
 
-# ---- Durable Object migrations (Free plan uses sqlite-backed DOs) ----
+# ---- Durable Object migrations (classic Durable Objects) ----
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["ProcessingStateV2"]
+new_classes = ["ProcessingStateV2"]
 
 # ---- Build (let CLI handle bundling, incl. `stripe`) ----
 [build]
