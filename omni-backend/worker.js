@@ -229,7 +229,7 @@ export default {
       return json({ error: 'Internal Server Error', details: error.message, requestId: crypto.randomUUID() }, 500, corsHeaders);
     }
   
-};
+
 
 // ---------- Stripe IDs ----------
 const STRIPE_PRICE_IDS = {
