@@ -11,6 +11,9 @@ ENVIRONMENT = "development"                       # default; overridden per-env 
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # Default frontend (overridden below)
 FRONTEND_URL = "http://localhost:3000"
+# ADMIN_API_TOKEN is **not** set at the root. Set it per-env via `wrangler secret put ADMIN_API_TOKEN`.
+# AUDIO_URL_SECRET is optional in dev (unsigned links), but **required** in production for signed R2 audio URLs.
+
 # NOTE: Do NOT set AUDIO_URL_SECRET here. Put it with `wrangler secret put AUDIO_URL_SECRET`. Leave unset in dev if you want unsigned.
 # Admin header token for privileged endpoints (/debug-env, /__log)
 
@@ -46,8 +49,8 @@ class_name = "ProcessingStateV2"
 
 # ---- Durable Object migrations (classic Durable Objects) ----
 [[migrations]]
-tag = "v1"
-new_classes = ["ProcessingStateV2"]
+ tag = "v1"
+ new_classes = ["ProcessingStateV2"]
 
 # ---- Build (let CLI handle bundling, incl. `stripe`) ----
 [build]
@@ -65,6 +68,7 @@ WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
 # In dev you can leave AUDIO_URL_SECRET blank for unsigned preview URLs. In prod it must be a secret.
 # Use a dev token; put the real value with `wrangler secret put ADMIN_API_TOKEN`
 ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"
+# For dev, you may omit AUDIO_URL_SECRET to allow unsigned preview links
 
 # KV (array tables!)
 [[env.development.kv_namespaces]]
@@ -106,6 +110,8 @@ class_name = "ProcessingStateV2"
 ENVIRONMENT = "preview"
 FRONTEND_URL = "https://omni2-8d2.pages.dev"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+# Set with:  wrangler secret put ADMIN_API_TOKEN --env preview
+# Optional unsigned links: omit AUDIO_URL_SECRET in preview
 
 [[env.preview.kv_namespaces]]
 binding = "CACHE"
@@ -141,6 +147,9 @@ class_name = "ProcessingStateV2"
 ENVIRONMENT = "production"
 FRONTEND_URL = "https://fwea-i.com"   # live site origin (no trailing slash)
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+# Required secrets in prod (set with `wrangler secret put --env production`):
+#   ADMIN_API_TOKEN
+#   AUDIO_URL_SECRET
 
 # KV
 [[env.production.kv_namespaces]]
@@ -175,3 +184,9 @@ dataset = "omni_analytics"
 [[env.production.durable_objects.bindings]]
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
+
+
+# ===== Helper commands =====
+# Deploy dev:       npx wrangler deploy --env development
+# Deploy preview:   npx wrangler deploy --env preview
+# Deploy production:npx wrangler deploy --env production
