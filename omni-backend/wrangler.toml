@@ -1,192 +1,130 @@
-name = "omnibackend2"
+# FWEA-I Cloudflare Worker Configuration
+# This file configures the deployment settings for your audio cleaning service
+
+name = "fwea-i-backend"
 main = "worker.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-12-10"
 compatibility_flags = ["nodejs_compat"]
+
+# Worker settings
 workers_dev = true
+route = { pattern = "api.fwea-i.com/*", zone_name = "fwea-i.com" }
 
-# ---------- Shared defaults ----------
-[vars]
-ENVIRONMENT = "development"                       # default; overridden per-env below
-# Worker base (used to build signed audio URLs). Leave set to your worker host.
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# Default frontend (overridden below)
-FRONTEND_URL = "http://localhost:3000"
-# ADMIN_API_TOKEN is **not** set at the root. Set it per-env via `wrangler secret put ADMIN_API_TOKEN`.
-# AUDIO_URL_SECRET is optional in dev (unsigned links), but **required** in production for signed R2 audio URLs.
+# Durable Objects
+[durable_objects]
+bindings = [
+  { name = "PROCESSING_STATE", class_name = "ProcessingStateV2" }
+]
 
-# NOTE: Do NOT set AUDIO_URL_SECRET here. Put it with `wrangler secret put AUDIO_URL_SECRET`. Leave unset in dev if you want unsigned.
-# Admin header token for privileged endpoints (/debug-env, /__log)
+[[migrations]]
+tag = "v1"
+new_classes = ["ProcessingStateV2"]
 
-# ---- KV (Cache) ----
-[[kv_namespaces]]
-binding = "CACHE"
-id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
-
-# ---- D1 Database ----
-[[d1_databases]]
-binding = "DB"
-database_name = "omnidb"
-database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
-
-# ---- R2 Bucket (audio) ----
+# R2 Storage for audio files
 [[r2_buckets]]
 binding = "AUDIO_STORAGE"
-bucket_name = "fwea-audio-files"
+bucket_name = "fwea-i-audio-files"
+preview_bucket_name = "fwea-i-audio-files-preview"
 
-# ---- Workers AI ----
+# D1 Database for user data and analytics
+[[d1_databases]]
+binding = "DB"
+database_name = "fwea-i-production"
+database_id = "your-database-id-here"
+preview_database_id = "your-preview-database-id-here"
+
+# KV Storage for profanity lists and caching
+[[kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "your-profanity-kv-id-here"
+preview_id = "your-profanity-kv-preview-id-here"
+
+# Workers AI binding
 [ai]
 binding = "AI"
 
-# ---- Analytics Engine ----
-[[analytics_engine_datasets]]
-binding = "ANALYTICS"
-dataset = "omni_analytics"
+# Queue for background processing
+[[queues]]
+binding = "PROCESSING_QUEUE"
+queue_name = "audio-processing"
 
-# ---- Durable Objects ----
-[[durable_objects.bindings]]
-name = "PROCESSING_STATE_V2"
-class_name = "ProcessingStateV2"
+# Environment variables (secrets managed via dashboard/CLI)
+[vars]
+FRONTEND_URL = "https://fwea-i.com"
+WORKER_BASE_URL = "https://api.fwea-i.com"
 
-# ---- Durable Object migrations (classic Durable Objects) ----
-[[migrations]]
- tag = "v1"
- new_classes = ["ProcessingStateV2"]
-
-# ---- Build (let CLI handle bundling, incl. `stripe`) ----
-[build]
-command = ""
-
-[placement]
-mode = "smart"
-
-# ================== DEVELOPMENT ==================
+# Development environment
 [env.development]
+name = "fwea-i-backend-dev"
+workers_dev = true
+
 [env.development.vars]
-ENVIRONMENT = "development"
-FRONTEND_URL = "https://omni2-8d2.pages.dev"
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# In dev you can leave AUDIO_URL_SECRET blank for unsigned preview URLs. In prod it must be a secret.
-# Use a dev token; put the real value with `wrangler secret put ADMIN_API_TOKEN`
-ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"
-# For dev, you may omit AUDIO_URL_SECRET to allow unsigned preview links
+FRONTEND_URL = "http://localhost:3000"
+WORKER_BASE_URL = "http://localhost:8787"
 
-# KV (array tables!)
-[[env.development.kv_namespaces]]
-binding = "CACHE"
-id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
-
-[[env.development.kv_namespaces]]
-binding = "PROFANITY_LISTS"
-id = "PROFANITY_LISTS_DEV_ID"
-
-# D1 (optional override if you use a dev DB)
-# [[env.development.d1_databases]]
-# binding = "DB"
-# database_name = "omnidb"
-# database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
-
-# R2 (optional override if you use a dev bucket)
+# R2 buckets for development
 [[env.development.r2_buckets]]
 binding = "AUDIO_STORAGE"
-bucket_name = "fwea-audio-files"
+bucket_name = "fwea-i-audio-files-dev"
 
-# AI
-[env.development.ai]
-binding = "AI"
-
-# Analytics
-[[env.development.analytics_engine_datasets]]
-binding = "ANALYTICS"
-dataset = "omni_analytics"
-
-# DO binding mirrors root
-[[env.development.durable_objects.bindings]]
-name = "PROCESSING_STATE_V2"
-class_name = "ProcessingStateV2"
-
-# ================== PREVIEW ==================
-[env.preview]
-[env.preview.vars]
-ENVIRONMENT = "preview"
-FRONTEND_URL = "https://omni2-8d2.pages.dev"
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# Set with:  wrangler secret put ADMIN_API_TOKEN --env preview
-# Optional unsigned links: omit AUDIO_URL_SECRET in preview
-
-[[env.preview.kv_namespaces]]
-binding = "CACHE"
-id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
-
-[[env.preview.kv_namespaces]]
-binding = "PROFANITY_LISTS"
-id = "PROFANITY_LISTS_DEV_ID"
-
-[[env.preview.d1_databases]]
+# D1 database for development
+[[env.development.d1_databases]]
 binding = "DB"
-database_name = "omnidb"
-database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+database_name = "fwea-i-development"
+database_id = "your-dev-database-id-here"
 
-[[env.preview.r2_buckets]]
+# KV namespace for development
+[[env.development.kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "your-dev-profanity-kv-id-here"
+
+# Staging environment
+[env.staging]
+name = "fwea-i-backend-staging"
+route = { pattern = "staging-api.fwea-i.com/*", zone_name = "fwea-i.com" }
+
+[env.staging.vars]
+FRONTEND_URL = "https://staging.fwea-i.com"
+WORKER_BASE_URL = "https://staging-api.fwea-i.com"
+
+# R2 buckets for staging
+[[env.staging.r2_buckets]]
 binding = "AUDIO_STORAGE"
-bucket_name = "fwea-audio-files"
+bucket_name = "fwea-i-audio-files-staging"
 
-[env.preview.ai]
-binding = "AI"
+# D1 database for staging
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "fwea-i-staging"
+database_id = "your-staging-database-id-here"
 
-[[env.preview.analytics_engine_datasets]]
-binding = "ANALYTICS"
-dataset = "omni_analytics"
+# KV namespace for staging
+[[env.staging.kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "your-staging-profanity-kv-id-here"
 
-[[env.preview.durable_objects.bindings]]
-name = "PROCESSING_STATE_V2"
-class_name = "ProcessingStateV2"
-
-# ================== PRODUCTION ==================
+# Production environment (inherits top-level settings)
 [env.production]
-[env.production.vars]
-ENVIRONMENT = "production"
-FRONTEND_URL = "https://fwea-i.com"   # live site origin (no trailing slash)
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# Required secrets in prod (set with `wrangler secret put --env production`):
-#   ADMIN_API_TOKEN
-#   AUDIO_URL_SECRET
+name = "fwea-i-backend-prod"
+route = { pattern = "api.fwea-i.com/*", zone_name = "fwea-i.com" }
 
-# KV
-[[env.production.kv_namespaces]]
-binding = "CACHE"
-id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
+# Build configuration
+[build]
+command = "npm run build"
 
-[[env.production.kv_namespaces]]
-binding = "PROFANITY_LISTS"
-id = "PROFANITY_LISTS_PROD_ID"
+# Upload rules
+[upload]
+rules = [
+  { type = "ESModule", globs = ["**/*.js", "**/*.mjs"] },
+  { type = "CompiledWasm", globs = ["**/*.wasm"] },
+  { type = "Text", globs = ["**/*.txt", "**/*.json"] }
+]
 
-# D1
-[[env.production.d1_databases]]
-binding = "DB"
-database_name = "omnidb"
-database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+# Limits
+[limits]
+cpu_ms = 30000
+memory_mb = 128
 
-# R2
-[[env.production.r2_buckets]]
-binding = "AUDIO_STORAGE"
-bucket_name = "fwea-audio-files"
-
-# AI
-[env.production.ai]
-binding = "AI"
-
-# Analytics
-[[env.production.analytics_engine_datasets]]
-binding = "ANALYTICS"
-dataset = "omni_analytics"
-
-# Durable Objects
-[[env.production.durable_objects.bindings]]
-name = "PROCESSING_STATE_V2"
-class_name = "ProcessingStateV2"
-
-
-# ===== Helper commands =====
-# Deploy dev:       npx wrangler deploy --env development
-# Deploy preview:   npx wrangler deploy --env preview
-# Deploy production:npx wrangler deploy --env production
+# Observability
+[observability]
+enabled = true
