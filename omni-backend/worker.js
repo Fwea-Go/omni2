@@ -1,8 +1,9 @@
-// FWEA-I Backend — Cloudflare Worker (Updated and Fixed)
+// FWEA-I Backend — Cloudflare Worker (End-to-End)
 
+// ---------- Imports ----------
 import Stripe from 'stripe';
 
-// --- Durable Object: ProcessingStateV2 ---
+// ---------- Durable Object: ProcessingStateV2 ----------
 export class ProcessingStateV2 {
   constructor(state, env) {
     this.state = state;
@@ -43,117 +44,78 @@ export class ProcessingStateV2 {
   }
 }
 
-// ---------- Enhanced Profanity Detection ----------
-const PROF_CACHE = new Map();
+// ---------- Small state helpers (use DO as a lightweight KV) ----------
+async function getProcessingStub(env, name = 'global') {
+  if (!env?.PROCESSING_STATE) return null;
+  try { const id = env.PROCESSING_STATE.idFromName(name); return env.PROCESSING_STATE.get(id); }
+  catch { return null; }
+}
+async function putStateKV(env, key, value) {
+  const stub = await getProcessingStub(env);
+  if (!stub) return false;
+  try {
+    await stub.fetch('https://state/put', { method: 'PUT', body: JSON.stringify({ key, value }) });
+    return true;
+  } catch { return false; }
+}
+async function getStateKV(env, key) {
+  const stub = await getProcessingStub(env);
+  if (!stub) return null;
+  try {
+    const res = await stub.fetch('https://state/get?key=' + encodeURIComponent(key));
+    const txt = await res.text();
+    return txt && txt !== 'null' ? JSON.parse(txt) : null;
+  } catch { return null; }
+}
+function json(body, status = 200, corsHeaders = {}) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
 
+// ---------- Enhanced Profanity Detection (unchanged core) ----------
+const PROF_CACHE = new Map();
 async function getProfanityTrieFor(lang, env) {
   const key = `lists/${lang}.json`;
   if (PROF_CACHE.has(key)) return PROF_CACHE.get(key);
-
   let words = await env.PROFANITY_LISTS?.get(key, { type: 'json' });
   if (!Array.isArray(words)) words = [];
-
-  // Simple pattern matcher for better reliability
-  const patterns = words.map(word => ({
-    original: word,
-    normalized: normalizeForProfanity(String(word))
-  })).filter(p => p.normalized.length > 0);
-
+  const patterns = words.map(word => ({ original: word, normalized: normalizeForProfanity(String(word)) })).filter(p => p.normalized.length > 0);
   const pack = { patterns, words };
   PROF_CACHE.set(key, pack);
   return pack;
 }
-
 function normalizeForProfanity(s = '') {
   s = s.toLowerCase();
   s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  
-  const replacements = {
-    '@': 'a', '₳': 'a', 'Α': 'a', '4': 'a',
-    '0': 'o', 'о': 'o', 'Ο': 'o', '〇': 'o',
-    '1': 'i', 'l': 'i', '|': 'i', '！': 'i',
-    '$': 's', '5': 's',
-    '3': 'e', 'Ɛ': 'e',
-    '7': 't', 'Т': 't',
-    '¢': 'c', 'ç': 'c',
-    'ß': 'ss'
-  };
-
-  for (const [from, to] of Object.entries(replacements)) {
-    s = s.replaceAll(from, to);
-  }
-
-  s = s.replace(/(.)\1{2,}/g, '$1$1');
-  return s.replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const rep = {'@':'a','₳':'a','Α':'a','4':'a','0':'o','о':'o','Ο':'o','〇':'o','1':'i','l':'i','|':'i','！':'i','$':'s','5':'s','3':'e','Ɛ':'e','7':'t','Т':'t','¢':'c','ç':'c','ß':'ss'};
+  for (const [from,to] of Object.entries(rep)) s = s.replaceAll(from,to);
+  s = s.replace(/(.)\1{2,}/g,'$1$1');
+  return s.replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
 }
-
 async function matchProfanity(text, lang, env) {
   const pack = await getProfanityTrieFor(lang, env);
   const norm = normalizeForProfanity(text || '');
   if (!pack.patterns || !norm) return [];
-
   const hits = [];
-  
-  for (const pattern of pack.patterns) {
-    if (!pattern.normalized) continue;
-    
-    const regex = new RegExp(`\\b${escapeRegex(pattern.normalized)}\\b`, 'gi');
-    let match;
-    
-    while ((match = regex.exec(norm)) !== null) {
-      hits.push({
-        word: pattern.original,
-        start: match.index,
-        end: match.index + match[0].length,
-        confidence: 0.9
-      });
+  for (const p of pack.patterns) {
+    if (!p.normalized) continue;
+    const re = new RegExp(`\\b${escapeRegex(p.normalized)}\\b`, 'gi');
+    let m; while ((m = re.exec(norm)) !== null) {
+      hits.push({ word: p.original, start: m.index, end: m.index + m[0].length, confidence: 0.9 });
     }
   }
-
   return dedupeOverlaps(hits);
 }
+function escapeRegex(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+function dedupeOverlaps(arr){arr.sort((a,b)=>a.start-b.start||b.end-a.end);const out=[];let last=-1;for(const m of arr){if(m.start>=last){out.push(m);last=m.end}}return out}
+function normalizeLangs(langs=[]){const map={english:'en',spanish:'es',french:'fr',german:'de',portuguese:'pt',italian:'it',russian:'ru',chinese:'zh',arabic:'ar',japanese:'ja',korean:'ko',hindi:'hi',turkish:'tr',indonesian:'id',swahili:'sw'};const out=new Set();for(const l of langs){const k=String(l||'').toLowerCase();out.add(map[k]||k.slice(0,2))}return[...out]}
 
-function escapeRegex(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function dedupeOverlaps(arr) {
-  arr.sort((a, b) => a.start - b.start || b.end - a.end);
-  const out = [];
-  let lastEnd = -1;
-  
-  for (const m of arr) {
-    if (m.start >= lastEnd) { 
-      out.push(m); 
-      lastEnd = m.end; 
-    }
-  }
-  
-  return out;
-}
-
-function normalizeLangs(langs = []) {
-  const map = {
-    english: 'en', spanish: 'es', french: 'fr', german: 'de', portuguese: 'pt',
-    italian: 'it', russian: 'ru', chinese: 'zh', arabic: 'ar', japanese: 'ja',
-    korean: 'ko', hindi: 'hi', turkish: 'tr', indonesian: 'id', swahili: 'sw',
-  };
-  const out = new Set();
-  for (const l of langs) {
-    const k = String(l || '').toLowerCase();
-    out.add(map[k] || k.slice(0, 2));
-  }
-  return [...out];
-}
-
-// Main Worker
+// ---------- Main Worker ----------
 export default {
   async fetch(request, env) {
-    // Enhanced CORS
+    // CORS
     const reqOrigin = request.headers.get('Origin') || '';
     const workerOrigin = new URL(request.url).origin;
     const configuredFrontend = (env.FRONTEND_URL || '').replace(/\/+$/, '');
-
     const allowList = [
       configuredFrontend,
       workerOrigin,
@@ -162,7 +124,6 @@ export default {
       'http://localhost:3000',
       'http://127.0.0.1:3000'
     ].filter(Boolean);
-
     const pagesDevPattern = /^https:\/\/[a-z0-9-]+\.pages\.dev$/i;
     const isAllowed = allowList.includes(reqOrigin) || pagesDevPattern.test(reqOrigin);
     const allowOrigin = isAllowed && reqOrigin ? reqOrigin : workerOrigin;
@@ -177,44 +138,30 @@ export default {
       'Cross-Origin-Resource-Policy': 'cross-origin',
       'Timing-Allow-Origin': '*'
     };
-
-    if (allowOrigin !== workerOrigin && isAllowed) {
-      corsHeaders['Access-Control-Allow-Credentials'] = 'true';
-    }
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
+    if (allowOrigin !== workerOrigin && isAllowed) corsHeaders['Access-Control-Allow-Credentials'] = 'true';
+    if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
     const url = new URL(request.url);
 
     // Audio streaming
-    if (url.pathname.startsWith('/audio/')) {
-      return handleAudioDownload(request, env, corsHeaders);
-    }
+    if (url.pathname.startsWith('/audio/')) return handleAudioDownload(request, env, corsHeaders);
 
     try {
       switch (url.pathname) {
-        case '/process-audio':
-          return await handleAudioProcessing(request, env, corsHeaders);
-        case '/create-payment':
-          return await handlePaymentCreation(request, env, corsHeaders);
-        case '/webhook':
-          return await handleStripeWebhook(request, env, corsHeaders);
-        case '/activate-access':
-          return await handleAccessActivation(request, env, corsHeaders);
-        case '/validate-subscription':
-          return await handleSubscriptionValidation(request, env, corsHeaders);
-        case '/send-verification':
-          return await handleSendVerification(request, env, corsHeaders);
-        case '/verify-email-code':
-          return await handleEmailVerification(request, env, corsHeaders);
-        case '/track-event':
-          return await handleEventTracking(request, env, corsHeaders);
+        case '/process-audio':            return await handleAudioProcessing(request, env, corsHeaders);
+        case '/create-payment':           return await handlePaymentCreation(request, env, corsHeaders);
+        case '/webhook':                  return await handleStripeWebhook(request, env, corsHeaders);
+        case '/activate-access':          return await handleAccessActivation(request, env, corsHeaders);
+        case '/validate-subscription':    return await handleSubscriptionValidation(request, env, corsHeaders);
+        case '/send-verification':        return await handleSendVerification(request, env, corsHeaders);
+        case '/verify-email-code':        return await handleEmailVerification(request, env, corsHeaders);
+        case '/track-event':              return await handleEventTracking(request, env, corsHeaders);
+        case '/redeem-download':          return await handleRedeemDownload(request, env, corsHeaders);
+        case '/download-page':            return await handleDownloadPage(request, env, corsHeaders);
         case '/health':
-          return new Response(JSON.stringify({
+          return json({
             status: 'healthy',
-            version: '2.0.0',
+            version: '2.1.0',
             timestamp: Date.now(),
             services: {
               r2: Boolean(env.AUDIO_STORAGE),
@@ -223,52 +170,24 @@ export default {
               profanity_lists: Boolean(env.PROFANITY_LISTS),
               stripe: Boolean(env.STRIPE_SECRET_KEY)
             }
-          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-        // Admin endpoints
-        case '/ping-r2':
-          return await handlePingR2(request, env, corsHeaders);
-        case '/debug-audio':
-          return await handleDebugAudio(request, env, corsHeaders);
-        case '/sign-audio':
-          return await handleSignAudio(request, env, corsHeaders);
-        case '/debug-env':
-          return await handleDebugEnv(request, env, corsHeaders);
-        case '/__log':
-          return await handleAdminLog(request, env, corsHeaders);
-        case '/redeem-download':
-          return await handleRedeemDownload(request, env, corsHeaders);
-        case '/download-page':
-          return await handleDownloadPage(request, env, corsHeaders);
-
+          }, 200, corsHeaders);
         default:
           return new Response('Not Found', { status: 404, headers: corsHeaders });
       }
     } catch (error) {
       console.error('Worker Error:', error);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Internal Server Error', 
-          details: error.message,
-          requestId: crypto.randomUUID()
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return json({ error: 'Internal Server Error', details: error.message, requestId: crypto.randomUUID() }, 500, corsHeaders);
     }
   },
 };
 
-// Stripe Configuration
+// ---------- Stripe IDs ----------
 const STRIPE_PRICE_IDS = {
   SINGLE_TRACK: 'price_1S4NnmJ2Iq1764pCjA9xMnrn',
   DJ_PRO: 'price_1S4NpzJ2Iq1764pCcZISuhug',
   STUDIO_ELITE: 'price_1S4Nr3J2Iq1764pCzHY4zIWr',
   DAY_PASS: 'price_1S4NsTJ2Iq1764pCCbru0Aao',
 };
-
 const PRICE_BY_TYPE = {
   single_track: STRIPE_PRICE_IDS.SINGLE_TRACK,
   day_pass: STRIPE_PRICE_IDS.DAY_PASS,
@@ -276,153 +195,68 @@ const PRICE_BY_TYPE = {
   studio_elite: STRIPE_PRICE_IDS.STUDIO_ELITE,
 };
 
-// Audio Processing Handler
+// ---------- /process-audio ----------
 async function handleAudioProcessing(request, env, corsHeaders) {
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
-      status: 405, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
   try {
     const formData = await request.formData();
-    const audioFile = formData.get('audio');
+    const audioFile   = formData.get('audio');
     const fingerprint = formData.get('fingerprint') || 'anonymous';
-    const planType = formData.get('planType') || 'free';
-    const admin = isAdminRequest(request, env);
+    const planType    = formData.get('planType') || 'free';
+    const admin       = isAdminRequest(request, env);
     const effectivePlan = admin ? 'studio_elite' : planType;
 
-    if (!env.AUDIO_STORAGE) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Storage not configured',
-        hint: 'R2 bucket not properly bound'
-      }), {
-        status: 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    if (!env.AUDIO_STORAGE) return json({ success:false, error:'Storage not configured', hint:'Bind R2 bucket' }, 503, corsHeaders);
+    if (!audioFile)        return json({ success:false, error:'No audio file provided', hint:'Send FormData field \"audio\"' }, 400, corsHeaders);
 
-    if (!audioFile) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'No audio file provided',
-        hint: 'Send FormData with field name "audio"'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Validate file size
-    const maxSizes = {
-      free: 50 * 1024 * 1024,
-      single_track: 100 * 1024 * 1024,
-      day_pass: 100 * 1024 * 1024,
-      dj_pro: 200 * 1024 * 1024,
-      studio_elite: 500 * 1024 * 1024,
-    };
-
+    const maxSizes = { free: 50*1024*1024, single_track: 100*1024*1024, day_pass: 100*1024*1024, dj_pro: 200*1024*1024, studio_elite: 500*1024*1024 };
     const maxSize = maxSizes[effectivePlan] || maxSizes.free;
     if (audioFile.size > maxSize) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'File too large',
-        maxSize,
-        currentSize: audioFile.size,
-        upgradeRequired: effectivePlan === 'free'
-      }), {
-        status: 413,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return json({ success:false, error:'File too large', maxSize, currentSize: audioFile.size, upgradeRequired: effectivePlan==='free' }, 413, corsHeaders);
     }
 
-    // Process audio
     const processingResult = await processAudioWithAI(audioFile, effectivePlan, fingerprint, env, request);
 
-    // Store results
     if (env.DB) {
       await storeProcessingResult(fingerprint, processingResult, env, planType);
       await updateUsageStats(fingerprint, planType, audioFile.size, env);
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      ...processingResult
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-
+    return json({ success: true, ...processingResult }, 200, corsHeaders);
   } catch (error) {
     console.error('Audio processing error:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: 'Audio processing failed',
-      details: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return json({ success:false, error:'Audio processing failed', details: error.message }, 500, corsHeaders);
   }
 }
 
-// Payment Creation Handler
+// ---------- /create-payment ----------
 async function handlePaymentCreation(request, env, corsHeaders) {
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
   try {
     const { priceId, type, fileName, email, fingerprint } = await request.json();
 
-    if (!env.STRIPE_SECRET_KEY) {
-      return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (!env.FRONTEND_URL) {
-      return new Response(JSON.stringify({ error: 'Frontend URL not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    if (!env.STRIPE_SECRET_KEY) return json({ error:'Stripe not configured' }, 500, corsHeaders);
+    if (!env.FRONTEND_URL)      return json({ error:'Frontend URL not configured' }, 500, corsHeaders);
 
     const validPriceIds = Object.values(STRIPE_PRICE_IDS);
-    if (!validPriceIds.includes(priceId)) {
-      return new Response(JSON.stringify({ error: 'Invalid price ID' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    if (!validPriceIds.includes(priceId)) return json({ error:'Invalid price ID' }, 400, corsHeaders);
+    if (!['single_track','day_pass','dj_pro','studio_elite'].includes(type)) return json({ error:'Invalid plan type' }, 400, corsHeaders);
 
-    if (!['single_track', 'day_pass', 'dj_pro', 'studio_elite'].includes(type)) {
-      return new Response(JSON.stringify({ error: 'Invalid plan type' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-      apiVersion: '2024-06-20',
-      httpClient: Stripe.createFetchHttpClient(),
-    });
-
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20', httpClient: Stripe.createFetchHttpClient() });
     const isSubscription = (type === 'dj_pro' || type === 'studio_elite');
 
     const session = await stripe.checkout.sessions.create({
       mode: isSubscription ? 'subscription' : 'payment',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${env.FRONTEND_URL.replace(/\/+$/, '')}/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${env.FRONTEND_URL.replace(/\/+$/, '')}/success?session_id=\${CHECKOUT_SESSION_ID}`,
       cancel_url: `${env.FRONTEND_URL.replace(/\/+$/, '')}/cancel`,
       customer_email: email || undefined,
-      allow_promotion_codes: isSubscription || undefined,
-      billing_address_collection: isSubscription ? 'required' : 'auto',
+      allow_promotion_codes: true,
+      automatic_tax: { enabled: true },
+      customer_creation: 'if_required',
+      payment_method_types: ['card', 'link'], // Enable Link by Stripe
       metadata: {
         type: type || '',
         fileName: fileName || '',
@@ -432,57 +266,32 @@ async function handlePaymentCreation(request, env, corsHeaders) {
       },
     });
 
-    // Store payment intent
-    if (env.DB) {
-      await storePaymentIntent(session.id, type, priceId, fingerprint, env);
-    }
+    if (env.DB) await storePaymentIntent(session.id, type, priceId, fingerprint, env);
 
-    return new Response(JSON.stringify({
-      success: true,
-      sessionId: session.id,
-      url: session.url
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-
+    return json({ success: true, sessionId: session.id, url: session.url }, 200, corsHeaders);
   } catch (error) {
     console.error('Payment creation error:', error);
-    return new Response(JSON.stringify({
-      error: 'Payment creation failed',
-      details: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return json({ error:'Payment creation failed', details:error.message }, 500, corsHeaders);
   }
 }
 
-// AI Processing Function
+// ---------- AI (placeholder) ----------
 async function processAudioWithAI(audioFile, planType, fingerprint, env, request) {
   try {
     const audioBuffer = await audioFile.arrayBuffer();
-    
-    // Mock transcription for now - replace with actual AI call
+
+    // (Mock) transcription — plug in your real model here
     const transcription = {
       text: "This is a sample transcription with some inappropriate content",
       language: 'en',
-      segments: [{
-        start: 0,
-        end: 30,
-        text: "This is a sample transcription with some inappropriate content",
-        confidence: 0.9
-      }]
+      segments: [{ start: 0, end: 30, text: "This is a sample transcription with some inappropriate content", confidence: 0.9 }]
     };
 
-    // Language detection
     const detectedLanguages = extractLanguagesFromTranscription(transcription.text);
     const normalizedLanguages = normalizeLangs(detectedLanguages);
-    
-    // Profanity detection  
+
     const profanityResults = await findProfanityTimestamps(transcription, normalizedLanguages, env);
-    
-    // Generate audio outputs
+
     const audioOutputs = await generateAudioOutputs(
       audioBuffer,
       profanityResults,
@@ -505,156 +314,78 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
       quality: getQualityForPlan(planType),
       watermarkId: audioOutputs.watermarkId
     };
-
   } catch (error) {
     console.error('AI processing error:', error);
-    return {
-      success: false,
-      error: 'AI processing failed',
-      details: error.message
-    };
+    return { success:false, error:'AI processing failed', details:error.message };
   }
 }
 
-// Helper functions
-function extractLanguagesFromTranscription(text = '') {
-  const patterns = {
-    Spanish: /[ñáéíóúü¿¡]/i,
-    French: /[àâäéèêëïîôùûüÿç]/i,
-    German: /[äöüß]/i
-  };
-
-  const detected = ['English'];
-  for (const [lang, regex] of Object.entries(patterns)) {
-    if (regex.test(text)) detected.push(lang);
-  }
-  
-  return [...new Set(detected)];
-}
-
+// ---------- Lang / Profanity helpers ----------
+function extractLanguagesFromTranscription(text=''){const pats={Spanish:/[ñáéíóúü¿¡]/i,French:/[àâäéèêëïîôùûüÿç]/i,German:/[äöüß]/i};const out=['English'];for(const [lang,re] of Object.entries(pats)){if(re.test(text)) out.push(lang)}return[...new Set(out)]}
 async function findProfanityTimestamps(transcription, languages, env) {
   const timestamps = [];
-  
-  if (!transcription?.segments?.length) {
-    return { timestamps };
-  }
-
+  if (!transcription?.segments?.length) return { timestamps };
   const langCodes = normalizeLangs(languages);
-  
   for (const segment of transcription.segments) {
     for (const langCode of langCodes) {
       const matches = await matchProfanity(segment.text || '', langCode, env);
-      
       for (const match of matches) {
-        timestamps.push({
-          start: segment.start || 0,
-          end: segment.end || 30,
-          word: match.word,
-          language: langCode,
-          confidence: match.confidence || 0.8
-        });
+        timestamps.push({ start: segment.start || 0, end: segment.end || 30, word: match.word, language: langCode, confidence: match.confidence || 0.8 });
       }
     }
   }
-
   return { timestamps };
 }
 
+// ---------- R2 output & signing ----------
 async function generateAudioOutputs(audioBuffer, profanityResults, planType, previewDuration, fingerprint, env, mimeType, originalName, request) {
   const processId = generateProcessId();
   const base = getWorkerBase(env, request);
-  
-  // Generate preview
+
+  // preview
   const previewKey = `previews/${processId}_preview.mp3`;
-  const previewSlice = audioBuffer.slice(0, Math.min(audioBuffer.byteLength, previewDuration * 44100 * 2)); // Rough approximation
-  
+  const approxBytes = Math.min(audioBuffer.byteLength, previewDuration * 44100 * 2); // rough
+  const previewSlice = audioBuffer.slice(0, approxBytes);
   try {
     await env.AUDIO_STORAGE.put(previewKey, previewSlice, {
       httpMetadata: { contentType: 'audio/mpeg' },
-      customMetadata: {
-        plan: planType,
-        fingerprint,
-        originalName,
-        previewMs: String(previewDuration * 1000)
-      }
+      customMetadata: { plan: planType, fingerprint, originalName, previewMs: String(previewDuration * 1000) }
     });
-  } catch (e) {
-    console.warn('R2 put preview failed:', e?.message || e);
-  }
+  } catch (e) { console.warn('R2 put preview failed:', e?.message || e); }
 
   const { exp: pexp, sig: psig } = await signR2Key(previewKey, env, 15 * 60);
-  const previewUrl = psig 
-    ? `${base}/audio/${encodeURIComponent(previewKey)}?exp=${pexp}&sig=${psig}`
-    : `${base}/audio/${encodeURIComponent(previewKey)}`;
+  const previewUrl = psig ? `${base}/audio/${encodeURIComponent(previewKey)}?exp=${pexp}&sig=${psig}` : `${base}/audio/${encodeURIComponent(previewKey)}`;
 
-  // Generate full version for paid plans
-  let fullAudioUrl = null;
+  // full (paid)
+  let fullAudioUrl = null; let fullKey = null;
   if (planType !== 'free') {
-    const fullKey = `full/${processId}_full.mp3`;
-    
+    fullKey = `full/${processId}_full.mp3`;
     try {
       await env.AUDIO_STORAGE.put(fullKey, audioBuffer, {
         httpMetadata: { contentType: 'audio/mpeg' },
         customMetadata: { plan: planType, fingerprint, originalName }
       });
-    } catch (e) {
-      console.warn('R2 put full failed:', e?.message || e);
-    }
+    } catch (e) { console.warn('R2 put full failed:', e?.message || e); }
 
     const { exp: fexp, sig: fsig } = await signR2Key(fullKey, env, 60 * 60);
-    fullAudioUrl = fsig
-      ? `${base}/audio/${encodeURIComponent(fullKey)}?exp=${fexp}&sig=${fsig}`
-      : `${base}/audio/${encodeURIComponent(fullKey)}`;
+    fullAudioUrl = fsig ? `${base}/audio/${encodeURIComponent(fullKey)}?exp=${fexp}&sig=${fsig}` : `${base}/audio/${encodeURIComponent(fullKey)}`;
   }
 
-  return {
-    previewUrl,
-    fullAudioUrl,
-    watermarkId: generateWatermarkId(fingerprint)
-  };
-}
-
-// Utility functions
-function getPreviewDuration(plan) {
-  const durations = { free: 30, single_track: 45, day_pass: 45, dj_pro: 45, studio_elite: 60 };
-  return durations[plan] || 30;
-}
-
-function getQualityForPlan(plan) {
-  const qualities = { free: 'Standard', single_track: 'HD', day_pass: 'HD', dj_pro: 'HD+', studio_elite: 'Studio Grade' };
-  return qualities[plan] || 'Standard';
-}
-
-function generateProcessId() {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
-}
-
-function generateWatermarkId(fingerprint) {
-  return fingerprint + '_' + Date.now().toString(36);
-}
-
-function isAdminRequest(request, env) {
+  // Remember last keys for this fingerprint
   try {
-    const hdr = (request.headers.get('X-FWEA-Admin') || '').trim();
-    const tok = (env.ADMIN_API_TOKEN || '').trim();
-    if (!hdr || !tok) return false;
-    return hdr === tok; // Simple comparison for now
-  } catch {
-    return false;
-  }
+    await putStateKV(env, `latest:${fingerprint}`, { processId, previewKey, fullKey, originalName, planType });
+  } catch {}
+
+  return { previewUrl, fullAudioUrl, watermarkId: generateWatermarkId(fingerprint) };
 }
+
+function getPreviewDuration(plan){const d={free:30,single_track:45,day_pass:45,dj_pro:45,studio_elite:60};return d[plan]||30}
+function getQualityForPlan(plan){const q={free:'Standard',single_track:'HD',day_pass:'HD',dj_pro:'HD+',studio_elite:'Studio Grade'};return q[plan]||'Standard'}
+function generateProcessId(){return Date.now().toString(36)+Math.random().toString(36).substring(2)}
+function generateWatermarkId(fp){return fp+'_'+Date.now().toString(36)}
+function isAdminRequest(request, env){try{const hdr=(request.headers.get('X-FWEA-Admin')||'').trim();const tok=(env.ADMIN_API_TOKEN||'').trim();if(!hdr||!tok)return false;return hdr===tok}catch{return false}}
 
 function getWorkerBase(env, request) {
-  let base = (env.WORKER_BASE_URL || '').trim();
-  if (base) {
-    if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
-    try { 
-      const u = new URL(base); 
-      base = 'https://' + u.host; 
-    } catch {}
-    return base.replace(/\/+$/, '');
-  }
-  
   try {
     const origin = new URL(request.url).origin;
     const u = new URL(origin);
@@ -664,55 +395,41 @@ function getWorkerBase(env, request) {
   }
 }
 
+// HMAC signing for R2 keys
 async function hmacSHA256(message, secret) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  const b64 = btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
   return b64;
 }
-
 async function signR2Key(key, env, ttlSeconds = 15 * 60) {
-  if (!env.AUDIO_URL_SECRET) {
-    return { exp: 0, sig: '' };
-  }
-  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  if (!env.AUDIO_URL_SECRET) return { exp: 0, sig: '' };
+  const exp = Math.floor(Date.now()/1000) + ttlSeconds;
   const msg = `${key}:${exp}`;
   const sig = await hmacSHA256(msg, env.AUDIO_URL_SECRET);
   return { exp, sig };
 }
-
 async function verifySignedUrl(key, exp, sig, env) {
   if (!env.AUDIO_URL_SECRET) return true;
   if (!exp || !sig) return false;
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor(Date.now()/1000);
   if (Number(exp) <= now) return false;
   const msg = `${key}:${exp}`;
   const expected = await hmacSHA256(msg, env.AUDIO_URL_SECRET);
   return expected === sig;
 }
 
-// Audio download handler
+// ---------- Audio download ----------
 async function handleAudioDownload(request, env, corsHeaders) {
   const url = new URL(request.url);
   const key = decodeURIComponent(url.pathname.replace(/^\/audio\//, ''));
   if (!key) return new Response('Bad Request', { status: 400, headers: corsHeaders });
+  if (!env.AUDIO_STORAGE) return json({ error:'Storage not configured' }, 404, corsHeaders);
 
-  if (!env.AUDIO_STORAGE) {
-    return new Response(JSON.stringify({ error: 'Storage not configured' }), {
-      status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-
-  const exp = url.searchParams.get('exp');
-  const sig = url.searchParams.get('sig');
+  const exp = url.searchParams.get('exp'); const sig = url.searchParams.get('sig');
   const ok = await verifySignedUrl(key, exp, sig, env);
-  if (!ok) {
-    return new Response(JSON.stringify({ error: 'Invalid or expired link' }), {
-      status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
+  if (!ok) return json({ error:'Invalid or expired link' }, 403, corsHeaders);
 
   const r2Obj = await env.AUDIO_STORAGE.get(key);
   if (!r2Obj) return new Response('Not found', { status: 404, headers: corsHeaders });
@@ -724,120 +441,93 @@ async function handleAudioDownload(request, env, corsHeaders) {
     'Accept-Ranges': 'bytes',
     'Cache-Control': key.startsWith('previews/') ? 'public, max-age=3600' : 'private, max-age=7200'
   };
-
   return new Response(r2Obj.body, { status: 200, headers });
 }
 
-// Stub implementations for remaining handlers
+// ---------- Stripe webhook (ack only; add DB logic if needed) ----------
 async function handleStripeWebhook(request, env, corsHeaders) {
-  return new Response('OK', { status: 200, headers: corsHeaders });
+  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
+  const sig = request.headers.get('Stripe-Signature'); // present when configured
+  const secret = env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) return new Response('OK', { status: 200, headers: corsHeaders });
+  try {
+    const payload = await request.text();
+    console.log('stripe webhook len', payload.length, 'sig?', !!sig);
+    return new Response('OK', { status: 200, headers: corsHeaders });
+  } catch (e) {
+    console.error('webhook error', e);
+    return new Response('Bad payload', { status: 400, headers: corsHeaders });
+  }
 }
 
+// ---------- /activate-access (verify Checkout session and return signed full URL) ----------
 async function handleAccessActivation(request, env, corsHeaders) {
-  return new Response(JSON.stringify({ success: true }), { 
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-  });
-}
+  try {
+    const { fingerprint, sessionId } = await request.json();
+    if (!fingerprint || !sessionId) return json({ success:false, error:'Missing fingerprint or sessionId' }, 400, corsHeaders);
+    if (!env.STRIPE_SECRET_KEY) return json({ success:false, error:'Stripe not configured' }, 500, corsHeaders);
 
-async function handleSubscriptionValidation(request, env, corsHeaders) {
-  return new Response(JSON.stringify({ valid: true }), { 
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-  });
-}
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20', httpClient: Stripe.createFetchHttpClient() });
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const paid = (session.payment_status === 'paid') || (session.status === 'complete');
+    if (!paid) return json({ success:false, error:'Payment not completed' }, 402, corsHeaders);
 
-async function handleSendVerification(request, env, corsHeaders) {
-  return new Response(JSON.stringify({ success: true }), { 
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-  });
-}
+    const rec = await getStateKV(env, `latest:${fingerprint}`);
+    if (!rec || !rec.fullKey) return json({ success:true, message:'Payment verified, awaiting full audio generation.' }, 200, corsHeaders);
 
-async function handleEmailVerification(request, env, corsHeaders) {
-  return new Response(JSON.stringify({ valid: true }), { 
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-  });
-}
-
-async function handleEventTracking(request, env, corsHeaders) {
-  return new Response(JSON.stringify({ success: true }), { 
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-  });
-}
-
-async function handlePingR2(request, env, corsHeaders) {
-  if (!isAdminRequest(request, env)) {
-    return new Response('Forbidden', { status: 403, headers: corsHeaders });
+    const { exp, sig } = await signR2Key(rec.fullKey, env, 60 * 60);
+    const base = getWorkerBase(env, request);
+    const fullUrl = sig ? `${base}/audio/${encodeURIComponent(rec.fullKey)}?exp=${exp}&sig=${sig}` : `${base}/audio/${encodeURIComponent(rec.fullKey)}`;
+    return json({ success:true, downloadUrl: fullUrl }, 200, corsHeaders);
+  } catch (e) {
+    console.error('activate error', e);
+    return json({ success:false, error:'Activation failed', details:e.message }, 500, corsHeaders);
   }
-  return new Response(JSON.stringify({ ok: true, hasR2: Boolean(env.AUDIO_STORAGE) }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
 }
 
-async function handleDebugAudio(request, env, corsHeaders) {
-  if (!isAdminRequest(request, env)) {
-    return new Response('Forbidden', { status: 403, headers: corsHeaders });
-  }
-  return new Response(JSON.stringify({ debug: true }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
-
-async function handleSignAudio(request, env, corsHeaders) {
-  if (!isAdminRequest(request, env)) {
-    return new Response('Forbidden', { status: 403, headers: corsHeaders });
-  }
-  return new Response(JSON.stringify({ signed: true }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
-
-async function handleDebugEnv(request, env, corsHeaders) {
-  if (!isAdminRequest(request, env)) {
-    return new Response('Forbidden', { status: 403, headers: corsHeaders });
-  }
-  
-  const debug = {
-    has_AUDIO_URL_SECRET: Boolean(env.AUDIO_URL_SECRET),
-    FRONTEND_URL: env.FRONTEND_URL || null,
-    WORKER_BASE_URL: env.WORKER_BASE_URL || null,
-    has_R2: Boolean(env.AUDIO_STORAGE),
-    has_DB: Boolean(env.DB),
-    has_AI: Boolean(env.AI),
-    has_PROFANITY_KV: Boolean(env.PROFANITY_LISTS),
-    workerBase: getWorkerBase(env, request),
-  };
-  
-  return new Response(JSON.stringify(debug, null, 2), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
-
-async function handleAdminLog(request, env, corsHeaders) {
-  if (!isAdminRequest(request, env)) {
-    return new Response('Forbidden', { status: 403, headers: corsHeaders });
-  }
-  return new Response('OK', { headers: corsHeaders });
-}
+// ---------- Misc smaller endpoints ----------
+async function handleSubscriptionValidation(request, env, corsHeaders) { return json({ valid: true }, 200, corsHeaders); }
+async function handleSendVerification(request, env, corsHeaders)     { return json({ success: true }, 200, corsHeaders); }
+async function handleEmailVerification(request, env, corsHeaders)    { return json({ valid: true }, 200, corsHeaders); }
+async function handleEventTracking(request, env, corsHeaders)        { return json({ success: true }, 200, corsHeaders); }
 
 async function handleRedeemDownload(request, env, corsHeaders) {
-  return new Response('Redeem endpoint', { status: 200, headers: corsHeaders });
+  const url = new URL(request.url);
+  const fingerprint = url.searchParams.get('fingerprint') || '';
+  if (!fingerprint) return json({ error: 'Missing fingerprint' }, 400, corsHeaders);
+  const rec = await getStateKV(env, `latest:${fingerprint}`);
+  if (!rec?.fullKey) return json({ error: 'No full audio available yet' }, 404, corsHeaders);
+  const { exp, sig } = await signR2Key(rec.fullKey, env, 60 * 60);
+  const base = getWorkerBase(env, request);
+  const fullUrl = sig ? `${base}/audio/${encodeURIComponent(rec.fullKey)}?exp=${exp}&sig=${sig}` : `${base}/audio/${encodeURIComponent(rec.fullKey)}`;
+  return json({ downloadUrl: fullUrl }, 200, corsHeaders);
 }
 
 async function handleDownloadPage(request, env, corsHeaders) {
-  return new Response('Download page', { status: 200, headers: corsHeaders });
+  const url = new URL(request.url);
+  const sessionId = url.searchParams.get('session_id') || '';
+  const fingerprint = url.searchParams.get('fingerprint') || '';
+  const rec = fingerprint ? await getStateKV(env, `latest:${fingerprint}`) : null;
+  let link = '';
+  if (rec?.fullKey) {
+    const { exp, sig } = await signR2Key(rec.fullKey, env, 60 * 60);
+    const base = getWorkerBase(env, request);
+    link = sig ? `${base}/audio/${encodeURIComponent(rec.fullKey)}?exp=${exp}&sig=${sig}` : `${base}/audio/${encodeURIComponent(rec.fullKey)}`;
+  }
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/><title>FWEA-I Download</title></head>
+  <body style="font-family:system-ui,-apple-system,Segoe UI,Inter,sans-serif;background:#0a0a0f;color:#e5e7eb;display:grid;place-items:center;min-height:100vh;">
+    <main style="text-align:center;max-width:720px;padding:24px;">
+      <h1 style="margin:0 0 8px;">Payment Successful</h1>
+      <p style="opacity:.8;">Session: ${sessionId || 'N/A'}</p>
+      ${link ? `<a href="${link}" style="display:inline-block;margin-top:16px;padding:12px 18px;border-radius:999px;background:#00f5ff;color:#0f172a;font-weight:700;text-decoration:none;">Download Full Audio</a>`
+             : `<p style="margin-top:16px;opacity:.8;">Your audio is still processing. Refresh later for the download link.</p>`}
+    </main>
+  </body></html>`;
+  return new Response(html, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
-// Stub database functions
-async function storeProcessingResult(fingerprint, result, env, planType) {
-  if (!env.DB) return;
-  // Store processing result in database
-}
-
-async function updateUsageStats(fingerprint, planType, fileSize, env) {
-  if (!env.DB) return;
-  // Update usage statistics
-}
-
-async function storePaymentIntent(sessionId, type, priceId, fingerprint, env) {
-  if (!env.DB) return;
-  // Store payment intent in database
-}
+// ---------- Stubs / Notes ----------
+async function storeProcessingResult(){/* optional: your DB */}
+async function updateUsageStats(){/* optional: your DB */}
+async function storePaymentIntent(){/* optional: your DB */}
+// Note: basic durability for last processed file is handled by PROCESSING_STATE DO.
