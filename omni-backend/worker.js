@@ -151,37 +151,43 @@ function normalizeLangs(langs=[]){const map={english:'en',spanish:'es',french:'f
 
 export default {
   async fetch(request, env) {
-    // CORS
     const reqOrigin = request.headers.get('Origin') || '';
     const workerOrigin = new URL(request.url).origin;
-    const configuredFrontend = (env.FRONTEND_URL || '').replace(/\/+$/, '');
+    const configuredFrontend = (env.FRONTEND_URL || '').replace(/\/+$/,'');
     const allowList = [
       configuredFrontend,
       workerOrigin,
       'https://fwea-i.com',
       'https://www.fwea-i.com',
       'http://localhost:3000',
-      'http://127.0.0.1:3000'
+      'http://127.0.0.1:3000',
     ].filter(Boolean);
-    const pagesDevPattern = /^https:\/\/[a-z0-9-]+\.pages\.dev$/i;
-    const isAllowed = allowList.includes(reqOrigin) || pagesDevPattern.test(reqOrigin);
-    const allowOrigin = isAllowed && reqOrigin ? reqOrigin : workerOrigin;
+
+    const allowOrigin =
+      allowList.includes(reqOrigin) ? reqOrigin : workerOrigin;
 
     const corsHeaders = {
       'Access-Control-Allow-Origin': allowOrigin,
       'Vary': 'Origin',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
+      'Access-Control-Allow-Headers':
+        'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
       'Access-Control-Max-Age': '86400',
-      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified',
+      'Access-Control-Expose-Headers':
+        'content-range, accept-ranges, content-length, etag, content-type, last-modified',
       'Cross-Origin-Resource-Policy': 'cross-origin',
-      'Timing-Allow-Origin': '*'
+      'Timing-Allow-Origin': '*',
     };
-    if (allowOrigin !== workerOrigin && isAllowed) corsHeaders['Access-Control-Allow-Credentials'] = 'true';
-    if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
 
-    const url = new URL(request.url);
+    // ...handle routes...
+    const resp = await handleRoute(request, env);
+    return new Response(resp.body, { status: resp.status, headers: { ...resp.headers, ...corsHeaders }});
+  }
+}
 
 
 
