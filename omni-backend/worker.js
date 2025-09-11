@@ -10,6 +10,7 @@ export class ProcessingStateV2 {
     this.env = env;
     this.cache = new Map();
   }
+  
   async fetch(request) {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
@@ -148,6 +149,7 @@ function normalizeLangs(langs=[]){const map={english:'en',spanish:'es',french:'f
 
 // ---------- Main Worker ----------
 
+export default {
   async fetch(request, env) {
     // CORS
     const reqOrigin = request.headers.get('Origin') || '';
