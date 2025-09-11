@@ -167,7 +167,7 @@ export default {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
       'Access-Control-Max-Age': '86400',
       // Expose streaming/seek headers so &lt;audio&gt; can read them
-      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type',
       'Cross-Origin-Resource-Policy': 'cross-origin',
       'Timing-Allow-Origin': '*'
     };
@@ -291,6 +291,35 @@ export default {
               exists: false,
               error: e?.message || String(e)
             }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+        case '/sign-audio': {
+          if (!isAdminRequest(request, env)) {
+            return new Response('Forbidden', { status: 403, headers: corsHeaders });
+          }
+          const u = new URL(request.url);
+          const key = u.searchParams.get('key');
+          if (!key) {
+            return new Response(JSON.stringify({ error: 'Missing ?key=' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          try {
+            const { exp, sig } = await signR2Key(key, env, 15 * 60);
+            const base = getWorkerBase(env, request);
+            const url = sig
+              ? `${base}/audio/${encodeURIComponent(key)}?exp=${exp}&sig=${sig}`
+              : `${base}/audio/${encodeURIComponent(key)}`;
+            return new Response(JSON.stringify({ url, exp, sig }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (e) {
+            return new Response(JSON.stringify({ error: e?.message || String(e) }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
           }
         }
         default:
@@ -444,9 +473,13 @@ async function handleAudioDownload(request, env, corsHeaders) {
     'Accept-Ranges': 'bytes',
     'Cache-Control': key.startsWith('previews/') ? 'public, max-age=3600' : 'private, max-age=7200'
   };
-  headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges, Content-Length';
+  headers['Access-Control-Expose-Headers'] = 'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type';
+  // Set ETag header if available
+  const etag = r2Obj?.httpEtag || r2Obj?.etag || null;
+  if (etag) headers['ETag'] = etag;
   headers['Content-Disposition'] = key.startsWith('previews/') ? 'inline; filename="preview.mp3"' : 'inline; filename="full.mp3"';
-  if (!mime || !mime.startsWith('audio/')) {
+  // Harden MIME guard: fallback to audio/mpeg if missing or not audio
+  if (!headers['Content-Type'] || !String(headers['Content-Type']).startsWith('audio/')) {
     headers['Content-Type'] = 'audio/mpeg';
   }
 
@@ -864,11 +897,13 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
   let languages = ['English'];
   try {
     if (env.AI && typeof env.AI.run === 'function') {
-      // Use only the first 1MB for language sniffing to avoid OOM
       const sniff = audioBuffer.byteLength > 1024 * 1024 ? audioBuffer.slice(0, 1024 * 1024) : audioBuffer;
-      const resp = await env.AI.run('@cf/openai/whisper', {
-        audio: [...new Uint8Array(sniff)]
-      }).catch((e) => ({ error: e?.message || String(e) }));
+      let resp;
+      try {
+        resp = await env.AI.run('@cf/openai/whisper', { audio: [...new Uint8Array(sniff)] });
+      } catch (e) {
+        resp = { error: e?.message || String(e) };
+      }
       if (resp && !resp.error) {
         const extracted = extractLanguagesFromTranscription(resp?.text || '');
         if (extracted && extracted.length) languages = extracted;
@@ -890,9 +925,12 @@ async function processAudioWithAI(audioFile, planType, fingerprint, env, request
       // Cap payload for transcription to ~5MB to avoid memory-pressure errors on Workers AI
       const TRANSCRIBE_CAP = 5 * 1024 * 1024;
       const transBuf = audioBuffer.byteLength > TRANSCRIBE_CAP ? audioBuffer.slice(0, TRANSCRIBE_CAP) : audioBuffer;
-      const resp = await env.AI.run('@cf/openai/whisper', {
-        audio: [...new Uint8Array(transBuf)]
-      }).catch((e) => ({ error: e?.message || String(e) }));
+      let resp;
+      try {
+        resp = await env.AI.run('@cf/openai/whisper', { audio: [...new Uint8Array(transBuf)] });
+      } catch (e) {
+        resp = { error: e?.message || String(e) };
+      }
       if (resp && !resp.error) transcription = resp;
       else console.warn('Whisper transcribe error:', resp?.error);
     }
