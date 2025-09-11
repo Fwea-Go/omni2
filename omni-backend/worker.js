@@ -283,28 +283,6 @@ async function handleTranscribe(request, env, corsHeaders) {
   }
 }
 
-async function callTranscriberWithFile(audioFile, env) {
-  if (!env.TRANSCRIBE_ENDPOINT) {
-    throw new Error('TRANSCRIBE_ENDPOINT not set');
-  }
-  const url = env.TRANSCRIBE_ENDPOINT.replace(/\/+$/, '') + '/transcribe';
-
-  const fd = new FormData();
-  // Workers supports File; give it a filename & type if missing
-  const filename = audioFile.name || 'audio.mp3';
-  const type = audioFile.type || 'audio/mpeg';
-  fd.append('file', new File([await audioFile.arrayBuffer()], filename, { type }));
-
-  const headers = {};
-  if (env.TRANSCRIBE_TOKEN) {
-    headers['Authorization'] = `Bearer ${env.TRANSCRIBE_TOKEN}`;
-  }
-
-  const resp = await fetch(url, { method: 'POST', body: fd, headers });
-  if (!resp.ok) {
-    const txt = await resp.text().catch(() => '');
-    throw new Error(`Transcriber ${resp.status}: ${txt || 'request failed'}`);
-  }
 
   // Expecting JSON: { text, language?, segments?: [{start,end,text,confidence?}] }
   // If your service returns a different shape, normalize here.
@@ -403,11 +381,7 @@ async function handlePaymentCreation(request, env, corsHeaders) {
   }
 }
 
-// ---------- AI (placeholder) ----------
-
-
-    
-// NEW (real)
+/
  // ---------- AI (real) ----------
 
 
