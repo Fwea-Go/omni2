@@ -1,685 +1,1509 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FWEA-I - Professional Audio Cleaning</title>
-  <meta name="description" content="Clean profanity from audio files in 100+ languages using AI"/>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
-  <meta name="color-scheme" content="dark"/>
-  <meta name="theme-color" content="#0a0a0f"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FWEA-I - Professional Audio Cleaning</title>
+    <meta name="description" content="Clean profanity from audio files in 100+ languages using AI">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    :root{
-      --bg-1:#0a0a0f;
-      --bg-2:#15151f;
-      --glass:rgba(255,255,255,0.08);
-      --glass-strong:rgba(255,255,255,0.12);
-      --text:#E5E7EB;
-      --text-dim:#A8A8B8;
-      --accent:#00f5ff;
-      --accent-2:#00ff88;
-      --chip:rgba(255,255,255,0.12);
-      --chip-border:rgba(255,255,255,0.18);
-      --border:rgba(255,255,255,0.12);
-      --border-soft:rgba(255,255,255,0.08);
-    }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
 
-    body{
-      font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-      background:linear-gradient(135deg,var(--bg-1) 0%,var(--bg-2) 100%);
-      min-height:100vh;color:var(--text);overflow-x:hidden
-    }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
 
-    .container{max-width:1200px;margin:0 auto;padding:0 20px}
+        /* Header */
+        header {
+            padding: 2rem 0;
+            text-align: center;
+        }
 
-    /* Header */
-    header{padding:2rem 0;text-align:center}
-    .logo-section{display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:1rem}
-    .logo{
-      background:rgba(255,255,255,0.06);
-      padding:1rem;border-radius:16px;font-size:2rem
-    }
-    .brand-text h1{font-size:2.5rem;font-weight:800;color:var(--accent);margin-bottom:.5rem}
-    .brand-text p{font-size:1.1rem;opacity:.9}
+        .logo-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
 
-    .tagline{
-      font-size:2.5rem;font-weight:700;margin:2rem 0 1rem;
-      background:linear-gradient(45deg,var(--accent),var(--accent-2));
-      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-align:center
-    }
-    .subtitle{font-size:1.2rem;color:var(--text-dim);text-align:center;margin-bottom:2rem}
+        .logo {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 16px;
+            font-size: 2rem;
+        }
 
-    .features-banner{display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;margin:2rem 0}
-    .feature-badge{
-      background:var(--glass);backdrop-filter:blur(10px);
-      padding:.8rem 1.5rem;border-radius:50px;font-size:.9rem;font-weight:500;
-      border:1px solid var(--border);transition:all .3s ease
-    }
-    .feature-badge:hover{background:rgba(255,255,255,0.15);transform:translateY(-2px)}
+        .brand-text h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #00f5ff;
+            margin-bottom: 0.5rem;
+        }
 
-    /* Main */
-    .main-content{display:grid;grid-template-columns:1fr;gap:2rem;margin-bottom:3rem}
+        .brand-text p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
 
-    /* Upload card */
-    .upload-section{
-      background:var(--glass);backdrop-filter:blur(20px);border-radius:20px;padding:2rem;
-      border:1px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.25)
-    }
-    .upload-area{
-      border:2px dashed rgba(255,255,255,0.25);border-radius:12px;padding:3rem 2rem;text-align:center;
-      transition:all .3s ease;cursor:pointer;min-height:200px;display:flex;flex-direction:column;justify-content:center;align-items:center
-    }
-    .upload-area:hover,.upload-area.drag-over{
-      border-color:var(--accent-2);background:rgba(0,255,136,0.08);transform:scale(1.02)
-    }
-    .upload-icon{font-size:3rem;margin-bottom:1rem;opacity:.8}
-    .upload-text{font-size:1.1rem;margin-bottom:.5rem;font-weight:600}
-    .upload-hint{font-size:.9rem;color:var(--text-dim);margin-bottom:1rem}
+        .tagline {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 2rem 0 1rem 0;
+            background: linear-gradient(45deg, #00f5ff, #00ff88);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
 
-    .supported-formats{display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;margin:1rem 0}
-    .format-tag{background:var(--chip);padding:.3rem .8rem;border-radius:20px;font-size:.8rem;font-weight:600;border:1px solid var(--chip-border)}
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
 
-    .choose-file-btn{
-      background:var(--accent);color:#0f172a;border:none;padding:.8rem 2rem;border-radius:50px;font-weight:800;cursor:pointer;
-      transition:all .3s ease;font-size:1rem
-    }
-    .choose-file-btn:hover{background:#00d4ff;transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,245,255,.25)}
-    .file-input{display:none}
+        .features-banner {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
 
-    /* Processing */
-    .processing-section{
-      background:var(--glass);backdrop-filter:blur(20px);border-radius:20px;padding:2rem;border:1px solid var(--border);
-      box-shadow:0 8px 32px rgba(0,0,0,.25);display:none
-    }
-    .processing-section.active{display:block;animation:slideInUp .5s ease-out}
-    @keyframes slideInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-    .processing-title{font-size:1.8rem;font-weight:800;margin-bottom:1rem;text-align:center}
-    .processing-status{text-align:center;color:var(--accent);margin-bottom:2rem}
+        .feature-badge {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 0.8rem 1.5rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
 
-    .progress-container{margin:2rem 0}
-    .progress-bar{width:100%;height:8px;background:var(--border-soft);border-radius:10px;overflow:hidden;margin:1rem 0}
-    .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:0%;transition:width .3s ease;border-radius:10px}
+        .feature-badge:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
 
-    .progress-steps{display:flex;justify-content:space-between;margin:2rem 0;flex-wrap:wrap;gap:1rem}
-    .step{display:flex;flex-direction:column;align-items:center;gap:.5rem;font-size:.8rem;opacity:.5;transition:all .3s ease;flex:1;text-align:center}
-    .step.active{opacity:1;color:var(--accent)}
-    .step.completed{opacity:.9;color:var(--accent-2)}
-    .step-icon{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:.5rem}
-    .step.active .step-icon{background:var(--accent);color:#0f172a;animation:pulse 1.5s infinite}
-    .step.completed .step-icon{background:var(--accent-2);color:#0f172a}
-    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,245,255,.7)}70%{box-shadow:0 0 0 10px rgba(0,245,255,0)}100%{box-shadow:0 0 0 0 rgba(0,245,255,0)}}
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
 
-    /* Results */
-    .results-section{
-      background:var(--glass);backdrop-filter:blur(20px);border-radius:20px;padding:2rem;border:1px solid var(--border);
-      box-shadow:0 8px 32px rgba(0,0,0,.25);display:none
-    }
-    .results-section.active{display:block;animation:slideInUp .5s ease-out}
-    .results-title{font-size:1.8rem;font-weight:800;margin-bottom:2rem;text-align:center}
+        /* Upload Section */
+        .upload-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
 
-    .audio-player{
-      background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);
-      border-radius:12px;padding:2rem;margin:2rem 0;text-align:center;color:#0f172a
-    }
-    .player-controls{display:flex;align-items:center;justify-content:center;gap:1rem;margin:1rem 0}
-    .progress-display{color:#0f172a;font-weight:700;font-size:1.1rem}
-    .play-btn{width:60px;height:60px;border-radius:50%;background:#0f172a;color:var(--accent);border:none;display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:pointer;transition:all .3s ease}
-    .play-btn:hover{transform:scale(1.1)}
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
 
-    .processing-complete{
-      background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);
-      border-radius:12px;padding:1.5rem;margin:2rem 0;text-align:center
-    }
+        .upload-area:hover,
+        .upload-area.drag-over {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            transform: scale(1.02);
+        }
 
-    .action-buttons{display:flex;gap:1rem;justify-content:center;margin:2rem 0;flex-wrap:wrap}
-    .btn{padding:.8rem 2rem;border-radius:50px;font-weight:800;cursor:pointer;transition:all .3s ease;font-size:1rem;border:none;text-decoration:none;display:inline-block}
-    .btn-primary{background:var(--accent);color:#0f172a}
-    .btn-secondary{background:transparent;color:var(--text);border:2px solid rgba(255,255,255,0.2)}
-    .btn:hover{transform:translateY(-2px)}
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.7;
+        }
 
-    /* Pricing */
-    .pricing-section{margin:4rem 0}
-    .pricing-header{text-align:center;margin-bottom:3rem}
-    .pricing-header h2{font-size:2rem;font-weight:800;margin-bottom:1rem}
-    .pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:2rem}
-    .pricing-card{
-      background:var(--glass);backdrop-filter:blur(20px);border-radius:20px;padding:2rem;border:1px solid var(--border);
-      box-shadow:0 8px 32px rgba(0,0,0,.25);transition:all .3s ease;position:relative;text-align:center
-    }
-    .pricing-card:hover{transform:translateY(-5px);box-shadow:0 12px 40px rgba(0,0,0,.35)}
-    .pricing-card.featured{border:2px solid var(--accent);transform:scale(1.05)}
-    .pricing-card.featured::before{
-      content:'Most Popular';position:absolute;top:-10px;left:50%;transform:translateX(-50%);
-      background:var(--accent);color:#0f172a;padding:.5rem 1rem;border-radius:20px;font-size:.8rem;font-weight:800
-    }
-    .plan-name{font-size:1.3rem;font-weight:800;margin-bottom:.5rem}
-    .plan-price{font-size:2.5rem;font-weight:900;color:var(--accent);margin-bottom:.5rem}
-    .plan-period{font-size:.9rem;color:var(--text-dim);margin-bottom:1.5rem}
-    .plan-features{list-style:none;margin:1.5rem 0;text-align:left}
-    .plan-features li{padding:.5rem 0;display:flex;align-items:center;gap:.8rem}
-    .plan-features li::before{content:'✓';color:var(--accent-2);font-weight:900;width:20px;text-align:center}
-    .plan-btn{width:100%;background:var(--accent);color:#0f172a;border:none;padding:1rem;border-radius:50px;font-weight:900;font-size:1rem;cursor:pointer;transition:all .3s ease;margin-top:1rem}
-    .plan-btn:hover{background:#00d4ff;transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,245,255,.25)}
+        .upload-text {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
 
-    /* Scroller banner */
-    .language-banner{position:fixed;bottom:0;left:0;width:100%;height:60px;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);overflow:hidden;z-index:1000}
-    .language-scroll{display:flex;animation:scroll 30s linear infinite;height:100%;align-items:center}
-    @keyframes scroll{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
-    .language-tag{
-      padding:.5rem 1rem;margin:0 .5rem;border-radius:20px;font-size:.9rem;font-weight:600;white-space:nowrap;flex-shrink:0
-    }
-    .language-tag:nth-child(4n+1){background:linear-gradient(45deg,#ff6b6b,#ee5a24)}
-    .language-tag:nth-child(4n+2){background:linear-gradient(45deg,#4ecdc4,#44a08d)}
-    .language-tag:nth-child(4n+3){background:linear-gradient(45deg,#45b7d1,#96c93d)}
-    .language-tag:nth-child(4n+4){background:linear-gradient(45deg,#f093fb,#f5576c)}
+        .upload-hint {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 1rem;
+        }
 
-    /* Footer */
-    footer{margin-top:4rem;padding:3rem 0 80px;border-top:1px solid var(--border-soft)}
-    .footer-content{display:grid;grid-template-columns:1fr auto;gap:2rem;align-items:center}
-    .footer-text{color:var(--text-dim)}
-    .admin-access{
-      background:rgba(0,0,0,.6);padding:1rem;border-radius:12px;border:1px solid var(--border)
-    }
-    .admin-access h4{font-size:.9rem;margin-bottom:.5rem;color:var(--accent)}
-    .admin-form{display:flex;gap:.5rem;align-items:center}
-    .admin-input{
-      background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:6px;padding:.5rem;color:var(--text);font-size:.8rem;width:120px
-    }
-    .admin-btn{background:var(--accent);color:#0f172a;border:none;padding:.5rem 1rem;border-radius:6px;font-size:.8rem;cursor:pointer;font-weight:800}
-    .admin-status{font-size:.7rem;margin-top:.5rem;color:var(--text-dim)}
+        .supported-formats {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
 
-    /* Alerts */
-    .alert{
-      position:fixed;top:20px;right:20px;padding:1rem 1.5rem;border-radius:12px;margin:1rem 0;border-left:4px solid;animation:slideInRight .3s ease-out;z-index:10000;max-width:400px
-    }
-    .alert-success{background:rgba(76,175,80,.1);border-color:#4CAF50;color:#7EE787}
-    .alert-warning{background:rgba(255,152,0,.1);border-color:#ff9800;color:#FFB86C}
-    .alert-error{background:rgba(244,67,54,.1);border-color:#f44336;color:#FF7B7B}
-    @keyframes slideInRight{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}
+        .format-tag {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
 
-    .hidden{display:none}.text-center{text-align:center}
+        .choose-file-btn {
+            background: #00f5ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
 
-    /* Responsive */
-    @media (max-width:768px){
-      .tagline{font-size:2rem}
-      .subtitle{font-size:1rem}
-      .features-banner{gap:1rem}
-      .feature-badge{padding:.6rem 1rem;font-size:.8rem}
-      .upload-area{padding:2rem 1rem;min-height:150px}
-      .upload-icon{font-size:2rem}
-      .progress-steps{flex-direction:column;gap:1rem}
-      .step{justify-content:center}
-      .pricing-grid{grid-template-columns:1fr}
-      .pricing-card.featured{transform:none}
-      .footer-content{grid-template-columns:1fr;text-align:center}
-      .admin-form{justify-content:center}
-    }
-  </style>
+        .choose-file-btn:hover {
+            background: #00d4ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 245, 255, 0.4);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        /* Processing Section */
+        .processing-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .processing-section.active {
+            display: block;
+            animation: slideInUp 0.5s ease-out;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .processing-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .processing-status {
+            text-align: center;
+            color: #00f5ff;
+            margin-bottom: 2rem;
+        }
+
+        .progress-container {
+            margin: 2rem 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00f5ff, #00ff88);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+            flex: 1;
+            text-align: center;
+        }
+
+        .step.active {
+            opacity: 1;
+            color: #00f5ff;
+        }
+
+        .step.completed {
+            opacity: 0.8;
+            color: #00ff88;
+        }
+
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            margin-bottom: 0.5rem;
+        }
+
+        .step.active .step-icon {
+            background: #00f5ff;
+            color: #1a1a2e;
+            animation: pulse 1.5s infinite;
+        }
+
+        .step.completed .step-icon {
+            background: #00ff88;
+            color: #1a1a2e;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 245, 255, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 245, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 245, 255, 0); }
+        }
+
+        /* Results Section */
+        .results-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+            animation: slideInUp 0.5s ease-out;
+        }
+
+        .results-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .audio-player {
+            background: linear-gradient(135deg, #00f5ff 0%, #00ff88 100%);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .progress-display {
+            color: #1a1a2e;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .play-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #1a1a2e;
+            color: #00f5ff;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .processing-complete {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #00f5ff;
+            color: #1a1a2e;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Pricing Section */
+        .pricing-section {
+            margin: 4rem 0;
+        }
+
+        .pricing-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .pricing-header h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .pricing-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            text-align: center;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .pricing-card.featured {
+            border: 2px solid #00f5ff;
+            transform: scale(1.05);
+        }
+
+        .pricing-card.featured::before {
+            content: "Most Popular";
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #00f5ff;
+            color: #1a1a2e;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .plan-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .plan-price {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #00f5ff;
+            margin-bottom: 0.5rem;
+        }
+
+        .plan-period {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 1.5rem;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+
+        .plan-features li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .plan-features li::before {
+            content: "✓";
+            color: #00ff88;
+            font-weight: bold;
+            width: 20px;
+            text-align: center;
+        }
+
+        .plan-btn {
+            width: 100%;
+            background: #00f5ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 1rem;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+        }
+
+        .plan-btn:hover {
+            background: #00d4ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 245, 255, 0.4);
+        }
+
+        /* Language Banner */
+        .language-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            z-index: 1000;
+        }
+
+        .language-scroll {
+            display: flex;
+            animation: scroll 30s linear infinite;
+            height: 100%;
+            align-items: center;
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .language-tag {
+            padding: 0.5rem 1rem;
+            margin: 0 0.5rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .language-tag:nth-child(4n+1) { background: linear-gradient(45deg, #ff6b6b, #ee5a24); }
+        .language-tag:nth-child(4n+2) { background: linear-gradient(45deg, #4ecdc4, #44a08d); }
+        .language-tag:nth-child(4n+3) { background: linear-gradient(45deg, #45b7d1, #96c93d); }
+        .language-tag:nth-child(4n+4) { background: linear-gradient(45deg, #f093fb, #f5576c); }
+
+        /* Footer */
+        footer {
+            margin-top: 4rem;
+            padding: 1.5rem 0 70px 0; /* tighter gap above language banner */
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            text-align: center;
+        }
+
+        .footer-text {
+            opacity: 0.8;
+            text-align: center;
+        }
+
+        .admin-access {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .admin-access h4 {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            color: #00f5ff;
+        }
+
+        .admin-form {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .admin-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 0.5rem;
+            color: white;
+            font-size: 0.8rem;
+            width: 120px;
+        }
+
+        .admin-btn {
+            background: #00f5ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .admin-status {
+            font-size: 0.7rem;
+            margin-top: 0.5rem;
+            opacity: 0.7;
+        }
+
+        /* Alerts */
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            border-left: 4px solid;
+            animation: slideInRight 0.3s ease-out;
+            z-index: 10000;
+            max-width: 400px;
+        }
+
+        .alert-success {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+
+        .alert-warning {
+            background: rgba(255, 152, 0, 0.1);
+            border-color: #ff9800;
+            color: #ff9800;
+        }
+
+        .alert-error {
+            background: rgba(244, 67, 54, 0.1);
+            border-color: #f44336;
+            color: #f44336;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Utility Classes */
+        .hidden { display: none; }
+        .text-center { text-align: center; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .tagline { font-size: 2rem; }
+            .subtitle { font-size: 1rem; }
+            .features-banner { gap: 1rem; }
+            .feature-badge { padding: 0.6rem 1rem; font-size: 0.8rem; }
+            .upload-area { padding: 2rem 1rem; min-height: 150px; }
+            .upload-icon { font-size: 2rem; }
+            .progress-steps { flex-direction: column; gap: 1rem; }
+            .step { justify-content: center; }
+            .pricing-grid { grid-template-columns: 1fr; }
+            .pricing-card.featured { transform: none; }
+            .footer-content { grid-template-columns: 1fr; text-align: center; }
+            .admin-form { justify-content: center; }
+        }
+    </style>
 </head>
 <body>
-  <!-- Header -->
-  <header>
-    <div class="container">
-      <div class="logo-section">
-        <div class="logo">F</div>
-        <div class="brand-text">
-          <h1>FWEA-I</h1>
-          <p>Omnilingual Clean Version Editor</p>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="logo-section">
+                <div class="brand-text">
+                    <h1>FWEA-I</h1>
+                    <p>Omnilingual Clean Version Editor</p>
+                </div>
+            </div>
+            
+            <nav style="display: flex; justify-content: center; gap: 2rem; margin: 2rem 0;">
+                <a href="#features" style="color: white; text-decoration: none; opacity: 0.8; hover: opacity: 1;">Features</a>
+                <a href="#pricing" style="color: white; text-decoration: none; opacity: 0.8;">Pricing</a>
+                <a href="#languages" style="color: white; text-decoration: none; opacity: 0.8;">Languages</a>
+                <a href="#support" style="color: white; text-decoration: none; opacity: 0.8;">Support</a>
+            </nav>
+            
+            <div class="tagline">Professional Audio Cleaning<br>In 100+ Languages</div>
+            <p class="subtitle">The world's most advanced omnilingual profanity removal tool. Perfect for DJs, artists, and content creators who demand pristine audio quality.</p>
+            
+            <div class="features-banner">
+                <div class="feature-badge">🌍 100+ Languages Supported</div>
+                <div class="feature-badge">🤖 AI-Powered Precision</div>
+                <div class="feature-badge">⚡ Lightning Fast Processing</div>
+                <div class="feature-badge">🔒 Studio-Grade Security</div>
+            </div>
         </div>
-      </div>
+    </header>
 
-      <nav style="display:flex;justify-content:center;gap:2rem;margin:2rem 0;">
-        <a href="#features" style="color:var(--text);text-decoration:none;opacity:.8;">Features</a>
-        <a href="#pricing" style="color:var(--text);text-decoration:none;opacity:.8;">Pricing</a>
-        <a href="#languages" style="color:var(--text);text-decoration:none;opacity:.8;">Languages</a>
-        <a href="#support" style="color:var(--text);text-decoration:none;opacity:.8;">Support</a>
-      </nav>
+    <!-- Main Content -->
+    <main class="container">
+        <div class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <h2 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;">🎵 Drag & Drop Your Audio</h2>
+                <p style="opacity: 0.8; margin-bottom: 1.5rem;">Upload your track and experience the future of audio cleaning</p>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Drag files here or click to browse</div>
+                    <div class="upload-hint">Maximum file size varies by plan</div>
+                    <button type="button" class="choose-file-btn" onclick="document.getElementById('fileInput').click()">
+                        📂 Choose Audio File
+                    </button>
+                    <div class="supported-formats">
+                        <span class="format-tag">MP3</span>
+                        <span class="format-tag">WAV</span>
+                        <span class="format-tag">FLAC</span>
+                        <span class="format-tag">M4A</span>
+                        <span class="format-tag">AAC</span>
+                        <span class="format-tag">OGG</span>
+                    </div>
+                </div>
+                
+                <input type="file" id="fileInput" class="file-input" accept="audio/*">
+                
+                <!-- File Info -->
+                <div id="fileInfo" class="hidden" style="margin-top: 1rem;">
+                    <div style="background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); border-radius: 12px; padding: 1.5rem;">
+                        <strong>🎵 6.0MB file uploaded! Get full clean version for just $4.99</strong><br>
+                        <strong>File:</strong> <span id="fileName"></span><br>
+                        <strong>Size:</strong> <span id="fileSize"></span><br>
+                        <strong>Type:</strong> <span id="fileType"></span>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="processAudio()" style="width: 100%; margin-top: 1rem;">
+                        🚀 Start Cleaning Process
+                    </button>
+                </div>
+            </section>
 
-      <div class="tagline">Professional Audio Cleaning<br/>In 100+ Languages</div>
-      <p class="subtitle">The world's most advanced omnilingual profanity removal tool. Perfect for DJs, artists, and content creators who demand pristine audio quality.</p>
+            <!-- Processing Section -->
+            <section class="processing-section" id="processingSection">
+                <h2 class="processing-title">Processing Your Audio</h2>
+                <p id="processingStatus" class="processing-status">Analyzing audio waveform and structure...</p>
+                
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div id="progressText" style="text-align: center; margin-top: 0.5rem;">15% • Estimated time: 2 seconds</div>
+                </div>
 
-      <div class="features-banner">
-        <div class="feature-badge">🌍 100+ Languages Supported</div>
-        <div class="feature-badge">🤖 AI-Powered Precision</div>
-        <div class="feature-badge">⚡ Lightning Fast Processing</div>
-        <div class="feature-badge">🔒 Studio-Grade Security</div>
-      </div>
+                <div class="progress-steps">
+                    <div class="step active" id="step1">
+                        <div class="step-icon">🔍</div>
+                        <span>Analysis</span>
+                        <small>Audio waveform</small>
+                    </div>
+                    <div class="step" id="step2">
+                        <div class="step-icon">🌍</div>
+                        <span>Language<br>Detection</span>
+                        <small>Multi-language AI</small>
+                    </div>
+                    <div class="step" id="step3">
+                        <div class="step-icon">🎯</div>
+                        <span>Content<br>Filtering</span>
+                        <small>Profanity removal</small>
+                    </div>
+                    <div class="step" id="step4">
+                        <div class="step-icon">🎵</div>
+                        <span>Audio<br>Reconstruction</span>
+                        <small>High-quality output</small>
+                    </div>
+                    <div class="step" id="step5">
+                        <div class="step-icon">✨</div>
+                        <span>Quality<br>Enhancement</span>
+                        <small>Final optimization</small>
+                    </div>
+                </div>
+
+                <div id="detectedLanguages" class="hidden">
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 8px;">
+                        <p><strong>🔍 Detecting Languages:</strong></p>
+                        <div id="languagesList" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Results Section -->
+        <section class="results-section" id="resultsSection">
+            <h2 class="results-title">🎉 Your Clean Audio is Ready!</h2>
+            
+            <div class="audio-player">
+                <div style="margin-bottom: 1rem;">
+                    <div style="color: #1a1a2e; font-weight: 600; font-size: 1.2rem; margin-bottom: 0.5rem;">🎵 Clean Audio Preview</div>
+                    <div style="color: #1a1a2e; opacity: 0.8;">0:30</div>
+                </div>
+                
+                <div class="player-controls">
+                    <button class="play-btn" id="playBtn">▶</button>
+                    <div class="progress-display">0:00 / 0:30</div>
+                    <div style="width: 100px; height: 4px; background: rgba(26, 26, 46, 0.3); border-radius: 2px; margin: 0 1rem;">
+                        <div style="width: 30%; height: 100%; background: #1a1a2e; border-radius: 2px;"></div>
+                    </div>
+                </div>
+                
+                <audio id="previewPlayer" style="display: none;" controls>
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+
+            <div class="processing-complete">
+                <h3>✅ Processing Complete!</h3>
+                <p>1 inappropriate words removed • 3 languages detected • Quality enhanced with AI</p>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-secondary">📥 Download Preview</button>
+                <button class="btn btn-primary" onclick="showPricing()">💎 Get Full Version</button>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section class="pricing-section" id="pricingSection">
+            <div class="pricing-header">
+                <h2>Choose Your Plan</h2>
+                <p style="opacity: 0.8; font-size: 1.1rem;">Professional audio cleaning for every need and budget</p>
+            </div>
+
+            <div class="pricing-grid">
+                <!-- Single Track -->
+                <div class="pricing-card" data-plan="single_track">
+                    <h3 class="plan-name">Single Track</h3>
+                    <div class="plan-price">$4.99</div>
+                    <div class="plan-period">per track</div>
+                    <ul class="plan-features">
+                        <li>1 audio track cleaning</li>
+                        <li>All 100+ languages</li>
+                        <li>45-second preview</li>
+                        <li>HD audio quality</li>
+                        <li>Instant download</li>
+                    </ul>
+                    <button class="plan-btn" onclick="selectPlan('single_track', 'price_1S4NnmJ2Iq1764pCjA9xMnrn')">
+                        Get Single Track
+                    </button>
+                </div>
+
+                <!-- DJ Pro -->
+                <div class="pricing-card featured" data-plan="dj_pro">
+                    <h3 class="plan-name">DJ Pro</h3>
+                    <div class="plan-price">$29.99</div>
+                    <div class="plan-period">per month</div>
+                    <ul class="plan-features">
+                        <li>Unlimited track cleaning</li>
+                        <li>All 100+ languages</li>
+                        <li>45-second previews</li>
+                        <li>Priority processing</li>
+                        <li>Batch processing</li>
+                        <li>Professional support</li>
+                    </ul>
+                    <button class="plan-btn" onclick="selectPlan('dj_pro', 'price_1S4NpzJ2Iq1764pCcZISuhug')">
+                        Start DJ Pro
+                    </button>
+                </div>
+
+                <!-- Studio Elite -->
+                <div class="pricing-card" data-plan="studio_elite">
+                    <h3 class="plan-name">Studio Elite</h3>
+                    <div class="plan-price">$99.99</div>
+                    <div class="plan-period">per month</div>
+                    <ul class="plan-features">
+                        <li>Everything in DJ Pro</li>
+                        <li>60-second previews</li>
+                        <li>Studio-grade quality</li>
+                        <li>API access</li>
+                        <li>Custom AI training</li>
+                        <li>Dedicated support</li>
+                        <li>Commercial licensing</li>
+                    </ul>
+                    <button class="plan-btn" onclick="selectPlan('studio_elite', 'price_1S4Nr3J2Iq1764pCzHY4zIWr')">
+                        Start Studio Elite
+                    </button>
+                </div>
+
+                <!-- Day Pass -->
+                <div class="pricing-card" data-plan="day_pass">
+                    <h3 class="plan-name">Day Pass</h3>
+                    <div class="plan-price">$9.99</div>
+                    <div class="plan-period">24 hours</div>
+                    <ul class="plan-features">
+                        <li>Unlimited tracks (24h)</li>
+                        <li>All 100+ languages</li>
+                        <li>45-second previews</li>
+                        <li>Batch processing</li>
+                        <li>HD audio quality</li>
+                    </ul>
+                    <button class="plan-btn" onclick="selectPlan('day_pass', 'price_1S4NsTJ2Iq1764pCCbru0Aao')">
+                        Get Day Pass
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-text">
+                    <p style="opacity: 0.8; margin-bottom: 1rem;">
+                        © 2025 Fxckin With Everything Around - Intelligence. All rights reserved.
+                    </p>
+                    <p style="opacity: 0.6; font-size: 0.9rem;">
+                        Professional audio cleaning technology • No refunds policy • Terms apply
+                    </p>
+                </div>
+                
+                <div class="admin-access">
+                    <h4>Admin Access</h4>
+                    <div class="admin-form">
+                        <input type="password" id="adminToken" class="admin-input" placeholder="Access token">
+                        <button class="admin-btn" onclick="adminLogin()">Login</button>
+                    </div>
+                    <div id="adminStatus" class="admin-status">Enter token to access admin features</div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Language Banner -->
+    <div class="language-banner">
+        <div class="language-scroll">
+            <span class="language-tag">Spanish</span>
+            <span class="language-tag">French</span>
+            <span class="language-tag">German</span>
+            <span class="language-tag">Italian</span>
+            <span class="language-tag">Portuguese</span>
+            <span class="language-tag">Russian</span>
+            <span class="language-tag">Chinese</span>
+            <span class="language-tag">Japanese</span>
+            <span class="language-tag">Korean</span>
+            <span class="language-tag">Arabic</span>
+            <span class="language-tag">Haitian Creole</span>
+            <span class="language-tag">Hindi</span>
+            <span class="language-tag">Bengali</span>
+            <span class="language-tag">Turkish</span>
+            <span class="language-tag">Vietnamese</span>
+            <span class="language-tag">Thai</span>
+            <span class="language-tag">Dutch</span>
+            <span class="language-tag">Swedish</span>
+            <span class="language-tag">Norwegian</span>
+            <span class="language-tag">Danish</span>
+            <span class="language-tag">Finnish</span>
+            <span class="language-tag">Polish</span>
+            <span class="language-tag">Czech</span>
+            <span class="language-tag">Hungarian</span>
+            <span class="language-tag">Romanian</span>
+            <span class="language-tag">Bulgarian</span>
+            <span class="language-tag">Croatian</span>
+            <span class="language-tag">Serbian</span>
+            <span class="language-tag">Greek</span>
+            <span class="language-tag">Hebrew</span>
+            <span class="language-tag">Persian</span>
+            <span class="language-tag">Urdu</span>
+            <span class="language-tag">Tamil</span>
+            <span class="language-tag">Telugu</span>
+            <span class="language-tag">Kannada</span>
+            <span class="language-tag">Malayalam</span>
+            <span class="language-tag">Gujarati</span>
+            <span class="language-tag">Punjabi</span>
+            <span class="language-tag">Marathi</span>
+            <span class="language-tag">Indonesian</span>
+            <span class="language-tag">Malay</span>
+            <span class="language-tag">Filipino</span>
+            <span class="language-tag">Swahili</span>
+            <span class="language-tag">Yoruba</span>
+            <span class="language-tag">Igbo</span>
+            <span class="language-tag">Hausa</span>
+            <span class="language-tag">Amharic</span>
+            <span class="language-tag">Zulu</span>
+            <span class="language-tag">Xhosa</span>
+            <span class="language-tag">Afrikaans</span>
+        </div>
     </div>
-  </header>
 
-  <!-- Main -->
-  <main class="container">
-    <div class="main-content">
-      <!-- Upload -->
-      <section class="upload-section">
-        <h2 style="font-size:1.8rem;font-weight:800;margin-bottom:1rem;">🎵 Drag & Drop Your Audio</h2>
-        <p style="color:var(--text-dim);margin-bottom:1.5rem;">Upload your track and experience the future of audio cleaning</p>
+    <script>
+        // Configuration
+        const CONFIG = {
+            API_BASE: window.location.origin,
+            SUPPORTED_FORMATS: ['audio/mpeg', 'audio/wav', 'audio/flac', 'audio/m4a', 'audio/aac', 'audio/ogg'],
+            MAX_FILE_SIZE: {
+                free: 50 * 1024 * 1024,
+                single_track: 100 * 1024 * 1024,
+                day_pass: 100 * 1024 * 1024,
+                dj_pro: 200 * 1024 * 1024,
+                studio_elite: 500 * 1024 * 1024
+            },
+            PREVIEW_DURATION: {
+                free: 30,
+                single_track: 45,
+                day_pass: 45,
+                dj_pro: 45,
+                studio_elite: 60
+            }
+        };
 
-        <div class="upload-area" id="uploadArea">
-          <div class="upload-icon">📁</div>
-          <div class="upload-text">Drag files here or click to browse</div>
-          <div class="upload-hint">Maximum file size varies by plan</div>
-          <button type="button" class="choose-file-btn" onclick="document.getElementById('fileInput').click()">📂 Choose Audio File</button>
-          <div class="supported-formats">
-            <span class="format-tag">MP3</span><span class="format-tag">WAV</span><span class="format-tag">FLAC</span>
-            <span class="format-tag">M4A</span><span class="format-tag">AAC</span><span class="format-tag">OGG</span>
-          </div>
-        </div>
+        // Global state
+        let currentFile = null;
+        let currentPlan = 'free';
+        let processingResult = null;
+        let userFingerprint = generateFingerprint();
+        let isAdmin = false;
 
-        <input type="file" id="fileInput" class="file-input" accept="audio/*"/>
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
 
-        <!-- File Info -->
-        <div id="fileInfo" class="hidden" style="margin-top:1rem;">
-          <div style="background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.3);border-radius:12px;padding:1.5rem;">
-            <strong>🎵 6.0MB file uploaded! Get full clean version for just $4.99</strong><br/>
-            <strong>File:</strong> <span id="fileName"></span><br/>
-            <strong>Size:</strong> <span id="fileSize"></span><br/>
-            <strong>Type:</strong> <span id="fileType"></span>
-          </div>
-          <button type="button" class="btn btn-primary" onclick="processAudio()" style="width:100%;margin-top:1rem;">🚀 Start Cleaning Process</button>
-        </div>
-      </section>
-
-      <!-- Processing -->
-      <section class="processing-section" id="processingSection">
-        <h2 class="processing-title">Processing Your Audio</h2>
-        <p id="processingStatus" class="processing-status">Analyzing audio waveform and structure...</p>
-
-        <div class="progress-container">
-          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-          <div id="progressText" style="text-align:center;margin-top:.5rem;">15% • Estimated time: 2 seconds</div>
-        </div>
-
-        <div class="progress-steps">
-          <div class="step active" id="step1"><div class="step-icon">🔍</div><span>Analysis</span><small>Audio waveform</small></div>
-          <div class="step" id="step2"><div class="step-icon">🌍</div><span>Language<br/>Detection</span><small>Multi-language AI</small></div>
-          <div class="step" id="step3"><div class="step-icon">🎯</div><span>Content<br/>Filtering</span><small>Profanity removal</small></div>
-          <div class="step" id="step4"><div class="step-icon">🎵</div><span>Audio<br/>Reconstruction</span><small>High-quality output</small></div>
-          <div class="step" id="step5"><div class="step-icon">✨</div><span>Quality<br/>Enhancement</span><small>Final optimization</small></div>
-        </div>
-
-        <div id="detectedLanguages" class="hidden">
-          <div style="background:var(--glass);padding:1rem;border-radius:8px;">
-            <p><strong>🔍 Detecting Languages:</strong></p>
-            <div id="languagesList" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem;"></div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <!-- Results -->
-    <section class="results-section" id="resultsSection">
-      <h2 class="results-title">🎉 Your Clean Audio is Ready!</h2>
-
-      <div class="audio-player">
-        <div style="margin-bottom:1rem;">
-          <div style="color:#0f172a;font-weight:700;font-size:1.2rem;margin-bottom:.5rem;">🎵 Clean Audio Preview</div>
-          <div style="color:#0f172a;opacity:.8;">0:30</div>
-        </div>
-
-        <div class="player-controls">
-          <button class="play-btn" id="playBtn">▶</button>
-          <div class="progress-display">0:00 / 0:30</div>
-          <div style="width:100px;height:4px;background:rgba(15,23,42,.25);border-radius:2px;margin:0 1rem;">
-            <div style="width:30%;height:100%;background:#0f172a;border-radius:2px;"></div>
-          </div>
-        </div>
-
-        <audio id="previewPlayer" style="display:none;" controls>Your browser does not support the audio element.</audio>
-      </div>
-
-      <div class="processing-complete">
-        <h3>✅ Processing Complete!</h3>
-        <p>1 inappropriate words removed • 3 languages detected • Quality enhanced with AI</p>
-      </div>
-
-      <div class="action-buttons">
-        <button class="btn btn-secondary">📥 Download Preview</button>
-        <button class="btn btn-primary" onclick="showPricing()">💎 Get Full Version</button>
-      </div>
-    </section>
-
-    <!-- Pricing -->
-    <section class="pricing-section" id="pricingSection">
-      <div class="pricing-header">
-        <h2>Choose Your Plan</h2>
-        <p style="color:var(--text-dim);font-size:1.1rem;">Professional audio cleaning for every need and budget</p>
-      </div>
-
-      <div class="pricing-grid">
-        <div class="pricing-card" data-plan="single_track">
-          <h3 class="plan-name">Single Track</h3>
-          <div class="plan-price">$4.99</div>
-          <div class="plan-period">per track</div>
-          <ul class="plan-features">
-            <li>1 audio track cleaning</li><li>All 100+ languages</li><li>45-second preview</li><li>HD audio quality</li><li>Instant download</li>
-          </ul>
-          <button class="plan-btn" onclick="selectPlan('single_track','price_1S4NnmJ2Iq1764pCjA9xMnrn')">Get Single Track</button>
-        </div>
-
-        <div class="pricing-card featured" data-plan="dj_pro">
-          <h3 class="plan-name">DJ Pro</h3>
-          <div class="plan-price">$29.99</div>
-          <div class="plan-period">per month</div>
-          <ul class="plan-features">
-            <li>Unlimited track cleaning</li><li>All 100+ languages</li><li>45-second previews</li><li>Priority processing</li><li>Batch processing</li><li>Professional support</li>
-          </ul>
-          <button class="plan-btn" onclick="selectPlan('dj_pro','price_1S4NpzJ2Iq1764pCcZISuhug')">Start DJ Pro</button>
-        </div>
-
-        <div class="pricing-card" data-plan="studio_elite">
-          <h3 class="plan-name">Studio Elite</h3>
-          <div class="plan-price">$99.99</div>
-          <div class="plan-period">per month</div>
-          <ul class="plan-features">
-            <li>Everything in DJ Pro</li><li>60-second previews</li><li>Studio-grade quality</li><li>API access</li><li>Custom AI training</li><li>Dedicated support</li><li>Commercial licensing</li>
-          </ul>
-          <button class="plan-btn" onclick="selectPlan('studio_elite','price_1S4Nr3J2Iq1764pCzHY4zIWr')">Start Studio Elite</button>
-        </div>
-
-        <div class="pricing-card" data-plan="day_pass">
-          <h3 class="plan-name">Day Pass</h3>
-          <div class="plan-price">$9.99</div>
-          <div class="plan-period">24 hours</div>
-          <ul class="plan-features">
-            <li>Unlimited tracks (24h)</li><li>All 100+ languages</li><li>45-second previews</li><li>Batch processing</li><li>HD audio quality</li>
-          </ul>
-          <button class="plan-btn" onclick="selectPlan('day_pass','price_1S4NsTJ2Iq1764pCCbru0Aao')">Get Day Pass</button>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- Footer -->
-  <footer>
-    <div class="container">
-      <div class="footer-content">
-        <div class="footer-text">
-          <p style="margin-bottom:1rem;">© 2025 Fxckin With Everything Around - Intelligence. All rights reserved.</p>
-          <p style="font-size:.9rem;">Professional audio cleaning technology • No refunds policy • Terms apply</p>
-        </div>
-
-        <div class="admin-access">
-          <h4>Admin Access</h4>
-          <div class="admin-form">
-            <input type="password" id="adminToken" class="admin-input" placeholder="Access token"/>
-            <button class="admin-btn" onclick="adminLogin()">Login</button>
-          </div>
-          <div id="adminStatus" class="admin-status">Enter token to access admin features</div>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-  <!-- Language Banner -->
-  <div class="language-banner">
-    <div class="language-scroll" id="languages">
-      <span class="language-tag">Spanish</span><span class="language-tag">French</span><span class="language-tag">German</span><span class="language-tag">Italian</span>
-      <span class="language-tag">Portuguese</span><span class="language-tag">Russian</span><span class="language-tag">Chinese</span><span class="language-tag">Japanese</span>
-      <span class="language-tag">Korean</span><span class="language-tag">Arabic</span><span class="language-tag">Haitian Creole</span><span class="language-tag">Hindi</span>
-      <span class="language-tag">Bengali</span><span class="language-tag">Turkish</span><span class="language-tag">Vietnamese</span><span class="language-tag">Thai</span>
-      <span class="language-tag">Dutch</span><span class="language-tag">Swedish</span><span class="language-tag">Norwegian</span><span class="language-tag">Danish</span>
-      <span class="language-tag">Finnish</span><span class="language-tag">Polish</span><span class="language-tag">Czech</span><span class="language-tag">Hungarian</span>
-      <span class="language-tag">Romanian</span><span class="language-tag">Bulgarian</span><span class="language-tag">Croatian</span><span class="language-tag">Serbian</span>
-      <span class="language-tag">Greek</span><span class="language-tag">Hebrew</span><span class="language-tag">Persian</span><span class="language-tag">Urdu</span>
-      <span class="language-tag">Tamil</span><span class="language-tag">Telugu</span><span class="language-tag">Kannada</span><span class="language-tag">Malayalam</span>
-      <span class="language-tag">Gujarati</span><span class="language-tag">Punjabi</span><span class="language-tag">Marathi</span><span class="language-tag">Indonesian</span>
-      <span class="language-tag">Malay</span><span class="language-tag">Filipino</span><span class="language-tag">Swahili</span><span class="language-tag">Yoruba</span>
-      <span class="language-tag">Igbo</span><span class="language-tag">Hausa</span><span class="language-tag">Amharic</span><span class="language-tag">Zulu</span>
-      <span class="language-tag">Xhosa</span><span class="language-tag">Afrikaans</span>
-    </div>
-  </div>
-
-  <script>
-    // ===== Config =====
-    const CONFIG = {
-      API_BASE: window.location.origin,
-      SUPPORTED_FORMATS: ['audio/mpeg','audio/wav','audio/flac','audio/m4a','audio/aac','audio/ogg'],
-      MAX_FILE_SIZE:{free:50*1024*1024,single_track:100*1024*1024,day_pass:100*1024*1024,dj_pro:200*1024*1024,studio_elite:500*1024*1024},
-      PREVIEW_DURATION:{free:30,single_track:45,day_pass:45,dj_pro:45,studio_elite:60}
-    };
-
-    let currentFile=null,currentPlan='free',processingResult=null,isAdmin=false;
-    let userFingerprint=generateFingerprint();
-
-    document.addEventListener('DOMContentLoaded',initializeApp);
-
-    function initializeApp(){
-      setupEventListeners();checkAdminStatus();
-      const urlParams=new URLSearchParams(window.location.search);
-      if(urlParams.get('success')==='true'){handlePaymentSuccess(urlParams.get('session_id'))}
-      else if(urlParams.get('canceled')==='true'){showAlert('Payment was cancelled. You can try again anytime.','warning')}
-    }
-
-    function setupEventListeners(){
-      const uploadArea=document.getElementById('uploadArea');
-      const fileInput=document.getElementById('fileInput');
-
-      uploadArea.addEventListener('dragover',handleDragOver);
-      uploadArea.addEventListener('dragleave',handleDragLeave);
-      uploadArea.addEventListener('drop',handleDrop);
-      uploadArea.addEventListener('click',()=>fileInput.click());
-      fileInput.addEventListener('change',handleFileSelect);
-
-      ['dragenter','dragover','dragleave','drop'].forEach(name=>{
-        document.addEventListener(name,(e)=>{e.preventDefault();e.stopPropagation()},false)
-      });
-    }
-
-    function handleDragOver(e){e.preventDefault();document.getElementById('uploadArea').classList.add('drag-over')}
-    function handleDragLeave(e){e.preventDefault();document.getElementById('uploadArea').classList.remove('drag-over')}
-    function handleDrop(e){
-      e.preventDefault();document.getElementById('uploadArea').classList.remove('drag-over');
-      const files=e.dataTransfer.files;if(files.length>0){handleFileSelect({target:{files}})}
-    }
-
-    function handleFileSelect(e){
-      const file=e.target.files[0];if(!file) return;
-      if(!isValidAudioFile(file)){showAlert('Please select a valid audio file (MP3, WAV, FLAC, M4A, AAC, OGG)','error');return}
-      const maxSize=CONFIG.MAX_FILE_SIZE[currentPlan];
-      if(file.size>maxSize){
-        showAlert(`File too large. Maximum size for ${currentPlan} plan: ${formatFileSize(maxSize)}`,'warning');
-        if(currentPlan==='free'){showPricing()} return;
-      }
-      currentFile=file;displayFileInfo(file);
-    }
-
-    function isValidAudioFile(file){return CONFIG.SUPPORTED_FORMATS.includes(file.type)||/\.(mp3|wav|flac|m4a|aac|ogg)$/i.test(file.name)}
-    function displayFileInfo(file){
-      document.getElementById('fileName').textContent=file.name;
-      document.getElementById('fileSize').textContent=formatFileSize(file.size);
-      document.getElementById('fileType').textContent=file.type||'Unknown';
-      document.getElementById('fileInfo').classList.remove('hidden');
-    }
-    function formatFileSize(b){if(b===0)return'0 Bytes';const k=1024;const s=['Bytes','KB','MB','GB'];const i=Math.floor(Math.log(b)/Math.log(k));return parseFloat((b/Math.pow(k,i)).toFixed(2))+' '+s[i]}
-
-    async function processAudio(){
-      if(!currentFile) return;
-      document.getElementById('processingSection').classList.add('active');
-      document.querySelector('.upload-section').style.opacity='.5';
-
-      try{
-        const formData=new FormData();
-        formData.append('audio',currentFile);
-        formData.append('fingerprint',userFingerprint);
-        formData.append('planType',currentPlan);
-        startProcessingAnimation();
-
-        const headers={'Accept':'application/json'};
-        if(isAdmin){headers['X-FWEA-Admin']=localStorage.getItem('adminToken')||''}
-
-        const response=await fetch(`${CONFIG.API_BASE}/process-audio`,{method:'POST',body:formData,headers});
-        if(!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const result=await response.json();
-        if(result.success){processingResult=result;showResults(result)} else {throw new Error(result.error||'Processing failed')}
-      }catch(err){
-        console.error('Processing error:',err);showAlert('Processing failed: '+err.message,'error');resetProcessing();
-      }
-    }
-
-    function startProcessingAnimation(){
-      const steps=['step1','step2','step3','step4','step5'];
-      const progressFill=document.getElementById('progressFill');
-      const progressText=document.getElementById('progressText');
-      const statusEl=document.getElementById('processingStatus');
-
-      let currentStep=0,progress=0;
-      const msgs=[
-        'Analyzing audio characteristics and format...',
-        'Detecting languages using AI models...',
-        'Scanning for inappropriate content...',
-        'Reconstructing clean audio...',
-        'Optimizing quality and applying enhancements...'
-      ];
-
-      const interval=setInterval(()=>{
-        progress=Math.min(95,progress+Math.random()*15);
-        progressFill.style.width=progress+'%';
-        progressText.textContent=`${Math.round(progress)}% • Processing...`;
-
-        if(currentStep<steps.length && progress>(currentStep+1)*18){
-          if(currentStep>0){
-            const prev=document.getElementById(steps[currentStep-1]);
-            prev.classList.remove('active');prev.classList.add('completed');
-          }
-          const step=document.getElementById(steps[currentStep]);
-          step.classList.add('active');statusEl.textContent=msgs[currentStep];
-
-          if(currentStep===1){
-            setTimeout(()=>{
-              document.getElementById('detectedLanguages').classList.remove('hidden');
-              simulateLanguageDetection();
-            },1000);
-          }
-          currentStep++;
+        function initializeApp() {
+            setupEventListeners();
+            checkAdminStatus();
+            
+            // Check for success/cancel parameters in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('success') === 'true') {
+                handlePaymentSuccess(urlParams.get('session_id'));
+            } else if (urlParams.get('canceled') === 'true') {
+                showAlert('Payment was cancelled. You can try again anytime.', 'warning');
+            }
         }
 
-        if(progress>=95){clearInterval(interval);completeProcessing()}
-      },300);
-    }
+        function setupEventListeners() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
 
-    function simulateLanguageDetection(){
-      const list=document.getElementById('languagesList');
-      const langs=['English','Spanish','French'];list.innerHTML='';
-      langs.forEach((lang,i)=>{
-        setTimeout(()=>{
-          const badge=document.createElement('span');
-          badge.className='format-tag';badge.textContent=lang;
-          badge.style.animation='slideInRight .3s ease-out';
-          list.appendChild(badge);
-        },i*500);
-      });
-    }
+            // Drag and drop
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', handleDrop);
+            uploadArea.addEventListener('click', () => fileInput.click());
 
-    function completeProcessing(){
-      ['step1','step2','step3','step4','step5'].forEach(id=>{
-        const s=document.getElementById(id);s.classList.remove('active');s.classList.add('completed');
-      });
-      document.getElementById('progressFill').style.width='100%';
-      document.getElementById('progressText').textContent='100% • Processing complete!';
-      document.getElementById('processingStatus').textContent='Audio cleaning completed successfully!';
-      setTimeout(()=>{document.getElementById('processingSection').classList.remove('active')},1500);
-    }
+            // File input
+            fileInput.addEventListener('change', handleFileSelect);
 
-    function showResults(result){
-      if(result.previewUrl){
-        const player=document.getElementById('previewPlayer');
-        player.src=result.previewUrl;player.style.display='block';
-      }
-      document.getElementById('resultsSection').classList.add('active');
-      trackEvent('processing_complete',{planType:currentPlan,fileSize:currentFile?.size,languages:result.languages,profanityFound:result.profanityFound});
-    }
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                document.addEventListener(eventName, preventDefaults, false);
+            });
 
-    function showPricing(){document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'})}
-
-    async function selectPlan(planType,priceId){
-      if(!currentFile){showAlert('Please upload an audio file first','warning');document.getElementById('uploadArea').scrollIntoView({behavior:'smooth'});return}
-      try{
-        const res=await fetch(`${CONFIG.API_BASE}/create-payment`,{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({priceId:priceId,type:planType,fileName:currentFile.name,fingerprint:userFingerprint})
-        });
-        if(!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        const data=await res.json();
-        if(data.success){
-          trackEvent('payment_initiated',{planType,priceId,sessionId:data.sessionId});
-          window.location.href=data.url;
-        }else{throw new Error(data.error||'Payment creation failed')}
-      }catch(err){
-        console.error('Payment error:',err);showAlert('Payment setup failed: '+err.message,'error');
-      }
-    }
-
-    async function handlePaymentSuccess(sessionId){
-      if(!sessionId) return;
-      try{
-        const res=await fetch(`${CONFIG.API_BASE}/activate-access`,{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({fingerprint:userFingerprint,sessionId})
-        });
-        const data=await res.json();
-        if(data.success){
-          showAlert('Payment successful! You now have access to the full version.','success');
-          const downloadUrl=`${CONFIG.API_BASE}/download-page?session_id=${sessionId}`;
-          setTimeout(()=>{window.location.href=downloadUrl},2000);
-        }else{
-          showAlert('Payment was successful, but activation failed. Please contact support.','warning');
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
         }
-      }catch(err){
-        console.error('Activation error:',err);
-        showAlert('Payment successful, but activation failed. Please contact support.','warning');
-      }
-    }
 
-    function resetProcessing(){
-      document.getElementById('processingSection').classList.remove('active');
-      document.getElementById('resultsSection').classList.remove('active');
-      document.querySelector('.upload-section').style.opacity='1';
-    }
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('uploadArea').classList.add('drag-over');
+        }
 
-    function showAlert(message,type='success'){
-      const div=document.createElement('div');div.className=`alert alert-${type}`;div.textContent=message;
-      document.body.appendChild(div);setTimeout(()=>div.remove(),5000);div.addEventListener('click',()=>div.remove());
-    }
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('uploadArea').classList.remove('drag-over');
+        }
 
-    function generateFingerprint(){
-      let f=localStorage.getItem('fwea_fingerprint');
-      if(!f){f=Date.now().toString(36)+Math.random().toString(36).substring(2);localStorage.setItem('fwea_fingerprint',f)}
-      return f;
-    }
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('uploadArea').classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect({ target: { files } });
+            }
+        }
 
-    async function trackEvent(eventName,data={}){
-      try{
-        await fetch(`${CONFIG.API_BASE}/track-event`,{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({event:eventName,fingerprint:userFingerprint,data,timestamp:Date.now(),url:window.location.href,userAgent:navigator.userAgent})
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!isValidAudioFile(file)) {
+                showAlert('Please select a valid audio file (MP3, WAV, FLAC, M4A, AAC, OGG)', 'error');
+                return;
+            }
+
+            // Validate file size
+            const maxSize = CONFIG.MAX_FILE_SIZE[currentPlan];
+            if (file.size > maxSize) {
+                showAlert(`File too large. Maximum size for ${currentPlan} plan: ${formatFileSize(maxSize)}`, 'warning');
+                if (currentPlan === 'free') {
+                    showPricing();
+                }
+                return;
+            }
+
+            currentFile = file;
+            displayFileInfo(file);
+        }
+
+        function isValidAudioFile(file) {
+            return CONFIG.SUPPORTED_FORMATS.includes(file.type) || 
+                   /\.(mp3|wav|flac|m4a|aac|ogg)$/i.test(file.name);
+        }
+
+        function displayFileInfo(file) {
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileType').textContent = file.type || 'Unknown';
+            document.getElementById('fileInfo').classList.remove('hidden');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function processAudio() {
+            if (!currentFile) return;
+
+            // Show processing section
+            document.getElementById('processingSection').classList.add('active');
+            document.querySelector('.upload-section').style.opacity = '0.5';
+
+            try {
+                const formData = new FormData();
+                formData.append('audio', currentFile);
+                formData.append('fingerprint', userFingerprint);
+                formData.append('planType', currentPlan);
+
+                // Start processing animation
+                startProcessingAnimation();
+
+                const headers = {
+                    'Accept': 'application/json'
+                };
+                
+                if (isAdmin) {
+                    headers['X-FWEA-Admin'] = localStorage.getItem('adminToken') || '';
+                }
+
+                const response = await fetch(`${CONFIG.API_BASE}/process-audio`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: headers
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    processingResult = result;
+                    showResults(result);
+                } else {
+                    throw new Error(result.error || 'Processing failed');
+                }
+
+            } catch (error) {
+                console.error('Processing error:', error);
+                showAlert('Processing failed: ' + error.message, 'error');
+                resetProcessing();
+            }
+        }
+
+        function startProcessingAnimation() {
+            const steps = ['step1', 'step2', 'step3', 'step4', 'step5'];
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const statusEl = document.getElementById('processingStatus');
+            
+            let currentStep = 0;
+            let progress = 0;
+
+            const stepMessages = [
+                'Analyzing audio characteristics and format...',
+                'Detecting languages using AI models...',
+                'Scanning for inappropriate content...',
+                'Reconstructing clean audio...',
+                'Optimizing quality and applying enhancements...'
+            ];
+
+            const interval = setInterval(() => {
+                // Update progress
+                progress = Math.min(95, progress + Math.random() * 15);
+                progressFill.style.width = progress + '%';
+                progressText.textContent = `${Math.round(progress)}% • Processing...`;
+
+                // Update steps
+                if (currentStep < steps.length && progress > (currentStep + 1) * 18) {
+                    // Complete previous step
+                    if (currentStep > 0) {
+                        const prevStep = document.getElementById(steps[currentStep - 1]);
+                        prevStep.classList.remove('active');
+                        prevStep.classList.add('completed');
+                    }
+
+                    // Activate current step
+                    const step = document.getElementById(steps[currentStep]);
+                    step.classList.add('active');
+                    statusEl.textContent = stepMessages[currentStep];
+
+                    // Show language detection
+                    if (currentStep === 1) {
+                        setTimeout(() => {
+                            document.getElementById('detectedLanguages').classList.remove('hidden');
+                            simulateLanguageDetection();
+                        }, 1000);
+                    }
+
+                    currentStep++;
+                }
+
+                // Complete processing
+                if (progress >= 95) {
+                    clearInterval(interval);
+                    completeProcessing();
+                }
+            }, 300);
+        }
+
+        function simulateLanguageDetection() {
+            const languagesList = document.getElementById('languagesList');
+            const languages = ['English', 'Spanish', 'French'];
+            
+            languagesList.innerHTML = '';
+            languages.forEach((lang, index) => {
+                setTimeout(() => {
+                    const badge = document.createElement('span');
+                    badge.className = 'format-tag';
+                    badge.textContent = lang;
+                    badge.style.animation = 'slideInRight 0.3s ease-out';
+                    languagesList.appendChild(badge);
+                }, index * 500);
+            });
+        }
+
+        function completeProcessing() {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const statusEl = document.getElementById('processingStatus');
+
+            // Complete all steps
+            ['step1', 'step2', 'step3', 'step4', 'step5'].forEach(stepId => {
+                const step = document.getElementById(stepId);
+                step.classList.remove('active');
+                step.classList.add('completed');
+            });
+
+            progressFill.style.width = '100%';
+            progressText.textContent = '100% • Processing complete!';
+            statusEl.textContent = 'Audio cleaning completed successfully!';
+
+            // Hide processing after a delay
+            setTimeout(() => {
+                document.getElementById('processingSection').classList.remove('active');
+            }, 1500);
+        }
+
+        function showResults(result) {
+            // Setup audio player
+            if (result.previewUrl) {
+                const player = document.getElementById('previewPlayer');
+                player.src = result.previewUrl;
+                player.style.display = 'block';
+            }
+
+            // Show results section
+            document.getElementById('resultsSection').classList.add('active');
+            
+            // Track event
+            trackEvent('processing_complete', {
+                planType: currentPlan,
+                fileSize: currentFile?.size,
+                languages: result.languages,
+                profanityFound: result.profanityFound
+            });
+        }
+
+        function showPricing() {
+            document.getElementById('pricingSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function selectPlan(planType, priceId) {
+            if (!currentFile) {
+                showAlert('Please upload an audio file first', 'warning');
+                document.getElementById('uploadArea').scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+
+            try {
+                const response = await fetch(`${CONFIG.API_BASE}/create-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        priceId: priceId,
+                        type: planType,
+                        fileName: currentFile.name,
+                        fingerprint: userFingerprint
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Track event
+                    trackEvent('payment_initiated', {
+                        planType: planType,
+                        priceId: priceId,
+                        sessionId: result.sessionId
+                    });
+
+                    // Redirect to Stripe Checkout
+                    window.location.href = result.url;
+                } else {
+                    throw new Error(result.error || 'Payment creation failed');
+                }
+
+            } catch (error) {
+                console.error('Payment error:', error);
+                showAlert('Payment setup failed: ' + error.message, 'error');
+            }
+        }
+
+        async function handlePaymentSuccess(sessionId) {
+            if (!sessionId) return;
+
+            try {
+                // Activate access
+                const response = await fetch(`${CONFIG.API_BASE}/activate-access`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fingerprint: userFingerprint,
+                        sessionId: sessionId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Payment successful! You now have access to the full version.', 'success');
+                    
+                    // Redirect to download page or provide download link
+                    const downloadUrl = `${CONFIG.API_BASE}/download-page?session_id=${sessionId}`;
+                    
+                    setTimeout(() => {
+                        window.location.href = downloadUrl;
+                    }, 2000);
+                } else {
+                    showAlert('Payment was successful, but activation failed. Please contact support.', 'warning');
+                }
+
+            } catch (error) {
+                console.error('Activation error:', error);
+                showAlert('Payment successful, but activation failed. Please contact support.', 'warning');
+            }
+        }
+
+        function resetProcessing() {
+            document.getElementById('processingSection').classList.remove('active');
+            document.getElementById('resultsSection').classList.remove('active');
+            document.querySelector('.upload-section').style.opacity = '1';
+        }
+
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+
+            document.body.appendChild(alertDiv);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+
+            // Make it clickable to dismiss
+            alertDiv.addEventListener('click', () => alertDiv.remove());
+        }
+
+        function generateFingerprint() {
+            let fingerprint = localStorage.getItem('fwea_fingerprint');
+            if (!fingerprint) {
+                fingerprint = Date.now().toString(36) + Math.random().toString(36).substring(2);
+                localStorage.setItem('fwea_fingerprint', fingerprint);
+            }
+            return fingerprint;
+        }
+
+        async function trackEvent(eventName, data = {}) {
+            try {
+                await fetch(`${CONFIG.API_BASE}/track-event`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        event: eventName,
+                        fingerprint: userFingerprint,
+                        data: data,
+                        timestamp: Date.now(),
+                        url: window.location.href,
+                        userAgent: navigator.userAgent
+                    })
+                });
+            } catch (error) {
+                console.warn('Event tracking failed:', error);
+            }
+        }
+
+        // Admin functions
+        function checkAdminStatus() {
+            const adminToken = localStorage.getItem('adminToken');
+            if (adminToken) {
+                isAdmin = true;
+                document.getElementById('adminStatus').textContent = 'Admin mode active';
+                document.getElementById('adminToken').value = '••••••••';
+            }
+        }
+
+        async function adminLogin() {
+            const token = document.getElementById('adminToken').value;
+            if (!token) return;
+
+            try {
+                const response = await fetch(`${CONFIG.API_BASE}/debug-env`, {
+                    headers: {
+                        'X-FWEA-Admin': token
+                    }
+                });
+
+                if (response.ok) {
+                    localStorage.setItem('adminToken', token);
+                    isAdmin = true;
+                    document.getElementById('adminStatus').textContent = 'Admin login successful';
+                    document.getElementById('adminToken').value = '••••••••';
+                    showAlert('Admin access granted', 'success');
+                } else {
+                    throw new Error('Invalid token');
+                }
+            } catch (error) {
+                document.getElementById('adminStatus').textContent = 'Invalid token';
+                showAlert('Admin login failed', 'error');
+            }
+        }
+
+        // Track initial page load
+        trackEvent('page_load', {
+            timestamp: Date.now(),
+            userAgent: navigator.userAgent,
+            referrer: document.referrer
         });
-      }catch{ /* noop */ }
-    }
-
-    function checkAdminStatus(){
-      const t=localStorage.getItem('adminToken');
-      if(t){isAdmin=true;document.getElementById('adminStatus').textContent='Admin mode active';document.getElementById('adminToken').value='••••••••'}
-    }
-
-    async function adminLogin(){
-      const token=document.getElementById('adminToken').value;if(!token) return;
-      try{
-        const r=await fetch(`${CONFIG.API_BASE}/debug-env`,{headers:{'X-FWEA-Admin':token}});
-        if(r.ok){
-          localStorage.setItem('adminToken',token);isAdmin=true;
-          document.getElementById('adminStatus').textContent='Admin login successful';
-          document.getElementById('adminToken').value='••••••••';showAlert('Admin access granted','success');
-        }else{throw new Error('Invalid token')}
-      }catch{
-        document.getElementById('adminStatus').textContent='Invalid token';showAlert('Admin login failed','error');
-      }
-    }
-
-    // initial page load event
-    trackEvent('page_load',{timestamp:Date.now(),userAgent:navigator.userAgent,referrer:document.referrer});
-  </script>
+    </script>
 </body>
 </html>
