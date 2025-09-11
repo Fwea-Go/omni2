@@ -283,18 +283,53 @@ async function handleTranscribe(request, env, corsHeaders) {
   }
 }
 
+// ---------- /process-audio (route handler) ----------
+async function handleAudioProcessing(request, env, corsHeaders) {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, corsHeaders);
+  }
 
-  // Expecting JSON: { text, language?, segments?: [{start,end,text,confidence?}] }
-  // If your service returns a different shape, normalize here.
-  const data = await resp.json().catch(async () => ({ text: await resp.text() }));
-  const text = data.text ?? '';
-  const language = data.language || 'en';
-  const segments = Array.isArray(data.segments)
-    ? data.segments
-    : [{ start: 0, end: 30, text, confidence: 0.9 }];
+  try {
+    const formData   = await request.formData();
+    const audioFile  = formData.get('audio') || formData.get('file');
+    const fingerprint = formData.get('fingerprint') || 'anonymous';
+    const planType    = formData.get('planType') || 'free';
 
-  return { text, language, segments };
+    const admin = (request.headers.get('X-FWEA-Admin') || '') === (env.ADMIN_API_TOKEN || '');
+    const effectivePlan = admin ? 'studio_elite' : planType;
+
+    if (!env.AUDIO_STORAGE) {
+      return json({ success:false, error:'Storage not configured', hint:'Bind R2 bucket' }, 503, corsHeaders);
+    }
+    if (!audioFile) {
+      return json({ success:false, error:'No audio file provided', hint:'Send FormData field "audio" (or "file")' }, 400, corsHeaders);
+    }
+
+    const maxSizes = {
+      free: 50*1024*1024, single_track: 100*1024*1024, day_pass: 100*1024*1024,
+      dj_pro: 200*1024*1024, studio_elite: 500*1024*1024
+    };
+    const maxSize = maxSizes[effectivePlan] || maxSizes.free;
+    if (audioFile.size > maxSize) {
+      return json({ success:false, error:'File too large', maxSize, currentSize: audioFile.size, upgradeRequired: effectivePlan==='free' }, 413, corsHeaders);
+    }
+
+    const processingResult = await processAudioWithAI(audioFile, effectivePlan, fingerprint, env, request);
+
+    try {
+      await storeProcessingResult(fingerprint, processingResult, env);
+      await updateUsageStats(fingerprint, planType, audioFile.size, env);
+    } catch {}
+
+    return json({ success: true, ...processingResult }, 200, corsHeaders);
+  } catch (error) {
+    console.error('Audio processing error:', error);
+    return json({ success:false, error:'Audio processing failed', details: error.message }, 500, corsHeaders);
+  }
 }
+
+  
+
 
 // ---------- /process-audio ----------
 async function processAudioWithAI(audioFile, planType, fingerprint, env, request) {
@@ -381,44 +416,8 @@ async function handlePaymentCreation(request, env, corsHeaders) {
   }
 }
 
-/
- // ---------- AI (real) ----------
 
-
-    // Call your transcriber
-    const transcription = await callTranscriberWithFile(audioFile, env);
-
-    const detectedLanguages  = extractLanguagesFromTranscription(transcription.text);
-    const normalizedLanguages = normalizeLangs(detectedLanguages);
-    const profanityResults    = await findProfanityTimestamps(transcription, normalizedLanguages, env);
-
-    const audioOutputs = await generateAudioOutputs(
-      audioBuffer,
-      profanityResults,
-      planType,
-      getPreviewDuration(planType),
-      fingerprint,
-      env,
-      audioFile.type,
-      audioFile.name,
-      request
-    );
-
-    return {
-      success: true,
-      previewUrl:   audioOutputs.previewUrl,
-      fullAudioUrl: audioOutputs.fullAudioUrl,
-      languages:    normalizedLanguages,
-      profanityFound: profanityResults.timestamps?.length || 0,
-      transcription: planType !== 'free' ? transcription : null,
-      quality:      getQualityForPlan(planType),
-      watermarkId:  audioOutputs.watermarkId,
-    };
-  } catch (error) {
-    console.error('AI processing error:', error);
-    return { success: false, error: 'AI processing failed', details: error.message };
-  }
-}
+    
 
 // ---------- Lang / Profanity helpers ----------
 function extractLanguagesFromTranscription(text=''){const pats={Spanish:/[ñáéíóúü¿¡]/i,French:/[àâäéèêëïîôùûüÿç]/i,German:/[äöüß]/i};const out=['English'];for(const [lang,re] of Object.entries(pats)){if(re.test(text)) out.push(lang)}return[...new Set(out)]}
