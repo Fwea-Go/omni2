@@ -451,8 +451,9 @@ async function handlePaymentCreation(request, env, cors) {
     const session = await stripe.checkout.sessions.create({
       mode: isSubscription ? "subscription" : "payment",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${env.FRONTEND_URL.replace(/\/+$/,"")}/success?session_id=\${CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.FRONTEND_URL.replace(/\/+$/,"")}/cancel`,
+      // in worker.js
+      success_url: `${env.FRONTEND_URL.replace(/\/+$/,'')}/omni3?success=true&session_id=\${CHECKOUT_SESSION_ID}`,
+      cancel_url:  `${env.FRONTEND_URL.replace(/\/+$/,'')}/omni3?canceled=true`,
       customer_email: email || undefined,
       allow_promotion_codes: true,
       automatic_tax: { enabled: true },
