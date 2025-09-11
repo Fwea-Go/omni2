@@ -758,8 +758,8 @@
                     <div class="upload-icon">📁</div>
                     <div class="upload-text">Drag files here or click to browse</div>
                     <div class="upload-hint">Maximum file size varies by plan</div>
-                    <button type="button" class="choose-file-btn" onclick="openFilePicker()">
-                        📂 Choose Audio File
+                    <button type="button" class="choose-file-btn" onclick="openFilePicker(event)">
+                          📂 Choose Audio File
                     </button>
                     <div class="supported-formats">
                         <span class="format-tag">MP3</span>
@@ -1035,491 +1035,388 @@
     </div>
 
     <script>
+        
         // Configuration
-        const CONFIG = {
-            API_BASE: "https://omnibackend2.fwea-i.workers.dev", 
-            SUPPORTED_FORMATS: ['audio/mpeg', 'audio/wav', 'audio/flac', 'audio/m4a', 'audio/aac', 'audio/ogg'],
-            MAX_FILE_SIZE: {
-                free: 50 * 1024 * 1024,
-                single_track: 100 * 1024 * 1024,
-                day_pass: 100 * 1024 * 1024,
-                dj_pro: 200 * 1024 * 1024,
-                studio_elite: 500 * 1024 * 1024
-            },
-            PREVIEW_DURATION: {
-                free: 30,
-                single_track: 45,
-                day_pass: 45,
-                dj_pro: 45,
-                studio_elite: 60
-            }
-        };
+     
+  // Optionally define window.FWEA_API_BASE *before* this block in prod/staging:
+  // <script>window.FWEA_API_BASE="https://api.fwea-i.com"
 
-        // Global state
-        let currentFile = null;
-        let currentPlan = 'free';
-        let processingResult = null;
-        let userFingerprint = generateFingerprint();
-        let isAdmin = false;
+  const CONFIG = {
+    API_BASE: window.FWEA_API_BASE || "https://omnibackend2.fweago-flavaz.workers.dev",
+    SUPPORTED_FORMATS: ['audio/mpeg','audio/wav','audio/flac','audio/m4a','audio/aac','audio/ogg'],
+    MAX_FILE_SIZE: {
+      free: 50 * 1024 * 1024,
+      single_track: 100 * 1024 * 1024,
+      day_pass: 100 * 1024 * 1024,
+      dj_pro: 200 * 1024 * 1024,
+      studio_elite: 500 * 1024 * 1024
+    },
+    PREVIEW_DURATION: {
+      free: 30, single_track: 45, day_pass: 45, dj_pro: 45, studio_elite: 60
+    }
+  };
+    
+<script>
+  // --- Configuration (override in HTML head with window.FWEA_API_BASE if needed) ---
+  const CONFIG = {
+    API_BASE: window.FWEA_API_BASE || "https://omnibackend2.fwea-i.workers.dev",
+    SUPPORTED_FORMATS: ['audio/mpeg','audio/wav','audio/flac','audio/m4a','audio/aac','audio/ogg'],
+    MAX_FILE_SIZE: { free: 50*1024*1024, single_track: 100*1024*1024, day_pass: 100*1024*1024, dj_pro: 200*1024*1024, studio_elite: 500*1024*1024 },
+    PREVIEW_DURATION: { free: 30, single_track: 45, day_pass: 45, dj_pro: 45, studio_elite: 60 }
+  };
 
-        // Initialize app
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-        });
+  // --- Global state ---
+  let currentFile = null;
+  let currentPlan = 'free';
+  let processingResult = null;
+  let userFingerprint = generateFingerprint();
+  let isAdmin = false;
 
-        function initializeApp() {
-            setupEventListeners();
-            checkAdminStatus();
-            
-            // Check for success/cancel parameters in URL
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('success') === 'true') {
-                handlePaymentSuccess(urlParams.get('session_id'));
-            } else if (urlParams.get('canceled') === 'true') {
-                showAlert('Payment was cancelled. You can try again anytime.', 'warning');
-            }
+  // --- Init ---
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+  });
+
+  function initializeApp() {
+    setupEventListeners();
+    checkAdminStatus();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+      handlePaymentSuccess(urlParams.get('session_id'));
+    } else if (urlParams.get('canceled') === 'true') {
+      showAlert('Payment was cancelled. You can try again anytime.', 'warning');
+    }
+  }
+
+  // --- File picking & DnD ---
+  function openFilePicker(e) {
+    if (e && e.stopPropagation) e.stopPropagation();      // stop bubbling into uploadArea
+    const fileInput = document.getElementById('fileInput');
+    fileInput.value = '';                                  // ensure change fires if same file is re-picked
+    fileInput.click();
+  }
+
+  function setupEventListeners() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput  = document.getElementById('fileInput');
+
+    uploadArea.addEventListener('dragover', handleDragOver);
+    uploadArea.addEventListener('dragleave', handleDragLeave);
+    uploadArea.addEventListener('drop', handleDrop);
+
+    // Click anywhere on the area EXCEPT the choose button
+    uploadArea.addEventListener('click', (e) => {
+      if (e.target.closest('.choose-file-btn')) return;    // avoid double dialogs
+      fileInput.value = '';
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', handleFileSelect);
+
+    // Prevent default drag behaviors across the doc
+    ['dragenter','dragover','dragleave','drop'].forEach(evt =>
+      document.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); }, false)
+    );
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    document.getElementById('uploadArea').classList.add('drag-over');
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault();
+    document.getElementById('uploadArea').classList.remove('drag-over');
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('uploadArea').classList.remove('drag-over');
+    const files = e.dataTransfer?.files || [];
+    if (files.length > 0) handleFileSelect({ target: { files } });
+  }
+
+  function handleFileSelect(e) {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+
+    if (!isValidAudioFile(file)) {
+      showAlert('Please select a valid audio file (MP3, WAV, FLAC, M4A, AAC, OGG)', 'error');
+      return;
+    }
+
+    const maxSize = CONFIG.MAX_FILE_SIZE[currentPlan];
+    if (file.size > maxSize) {
+      showAlert(`File too large. Maximum size for ${currentPlan} plan: ${formatFileSize(maxSize)}`, 'warning');
+      if (currentPlan === 'free') showPricing();
+      return;
+    }
+
+    currentFile = file;
+    displayFileInfo(file);
+  }
+
+  function isValidAudioFile(file) {
+    return CONFIG.SUPPORTED_FORMATS.includes(file.type) || /\.(mp3|wav|flac|m4a|aac|ogg)$/i.test(file.name || '');
+  }
+
+  function displayFileInfo(file) {
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = formatFileSize(file.size);
+    document.getElementById('fileType').textContent = file.type || 'Unknown';
+    document.getElementById('fileInfo').classList.remove('hidden');
+  }
+
+  function formatFileSize(bytes) {
+    if (!bytes) return '0 Bytes';
+    const k = 1024, sizes = ['Bytes','KB','MB','GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  }
+
+  // --- Processing ---
+  async function processAudio() {
+    if (!currentFile) return;
+
+    document.getElementById('processingSection').classList.add('active');
+    document.querySelector('.upload-section').style.opacity = '0.5';
+
+    try {
+      const formData = new FormData();
+      formData.append('audio', currentFile);
+      formData.append('fingerprint', userFingerprint);
+      formData.append('planType', currentPlan);
+
+      startProcessingAnimation();
+
+      const headers = { 'Accept': 'application/json' };
+      if (isAdmin) headers['X-FWEA-Admin'] = localStorage.getItem('adminToken') || '';
+
+      const resp = await fetch(`${CONFIG.API_BASE}/process-audio`, { method: 'POST', body: formData, headers });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+
+      const result = await resp.json();
+      if (result.success) {
+        processingResult = result;
+        showResults(result);
+      } else {
+        throw new Error(result.error || 'Processing failed');
+      }
+    } catch (err) {
+      console.error('Processing error:', err);
+      showAlert('Processing failed: ' + err.message, 'error');
+      resetProcessing();
+    }
+  }
+
+  function startProcessingAnimation() {
+    const steps = ['step1','step2','step3','step4','step5'];
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const statusEl = document.getElementById('processingStatus');
+
+    let currentStep = 0, progress = 0;
+    const stepMessages = [
+      'Analyzing audio characteristics and format...',
+      'Detecting languages using AI models...',
+      'Scanning for inappropriate content...',
+      'Reconstructing clean audio...',
+      'Optimizing quality and applying enhancements...'
+    ];
+
+    const interval = setInterval(() => {
+      progress = Math.min(95, progress + Math.random() * 15);
+      progressFill.style.width = progress + '%';
+      progressText.textContent = `${Math.round(progress)}% • Processing...`;
+
+      if (currentStep < steps.length && progress > (currentStep + 1) * 18) {
+        if (currentStep > 0) {
+          const prev = document.getElementById(steps[currentStep - 1]);
+          prev.classList.remove('active'); prev.classList.add('completed');
         }
+        const step = document.getElementById(steps[currentStep]);
+        step.classList.add('active');
+        statusEl.textContent = stepMessages[currentStep];
 
-        function openFilePicker() {
-            const fileInput = document.getElementById('fileInput');
-            // Ensure the change event fires even when the same file is chosen repeatedly
-            fileInput.value = '';
-            fileInput.click();
+        if (currentStep === 1) {
+          setTimeout(() => {
+            document.getElementById('detectedLanguages').classList.remove('hidden');
+            simulateLanguageDetection();
+          }, 1000);
         }
-
-        function setupEventListeners() {
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
-
-            // Drag and drop
-            uploadArea.addEventListener('dragover', handleDragOver);
-            uploadArea.addEventListener('dragleave', handleDragLeave);
-            uploadArea.addEventListener('drop', handleDrop);
-            uploadArea.addEventListener('click', () => { fileInput.value = ''; fileInput.click(); });
-
-            // File input
-            fileInput.addEventListener('change', handleFileSelect);
-
-            // Prevent default drag behaviors
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                document.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            document.getElementById('uploadArea').classList.add('drag-over');
-        }
-
-        function handleDragLeave(e) {
-            e.preventDefault();
-            document.getElementById('uploadArea').classList.remove('drag-over');
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            document.getElementById('uploadArea').classList.remove('drag-over');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileSelect({ target: { files } });
-            }
-        }
-
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            // Validate file type
-            if (!isValidAudioFile(file)) {
-                showAlert('Please select a valid audio file (MP3, WAV, FLAC, M4A, AAC, OGG)', 'error');
-                return;
-            }
-
-            // Validate file size
-            const maxSize = CONFIG.MAX_FILE_SIZE[currentPlan];
-            if (file.size > maxSize) {
-                showAlert(`File too large. Maximum size for ${currentPlan} plan: ${formatFileSize(maxSize)}`, 'warning');
-                if (currentPlan === 'free') {
-                    showPricing();
-                }
-                return;
-            }
-
-            currentFile = file;
-            displayFileInfo(file);
-        }
-
-        function isValidAudioFile(file) {
-            return CONFIG.SUPPORTED_FORMATS.includes(file.type) || 
-                   /\.(mp3|wav|flac|m4a|aac|ogg)$/i.test(file.name);
-        }
-
-        function displayFileInfo(file) {
-            document.getElementById('fileName').textContent = file.name;
-            document.getElementById('fileSize').textContent = formatFileSize(file.size);
-            document.getElementById('fileType').textContent = file.type || 'Unknown';
-            document.getElementById('fileInfo').classList.remove('hidden');
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        async function processAudio() {
-            if (!currentFile) return;
-
-            // Show processing section
-            document.getElementById('processingSection').classList.add('active');
-            document.querySelector('.upload-section').style.opacity = '0.5';
-
-            try {
-                const formData = new FormData();
-                formData.append('audio', currentFile);
-                formData.append('fingerprint', userFingerprint);
-                formData.append('planType', currentPlan);
-
-                // Start processing animation
-                startProcessingAnimation();
-
-                const headers = {
-                    'Accept': 'application/json'
-                };
-                
-                if (isAdmin) {
-                    headers['X-FWEA-Admin'] = localStorage.getItem('adminToken') || '';
-                }
-
-                const response = await fetch(`${CONFIG.API_BASE}/process-audio`, {
-                    method: 'POST',
-                    body: formData,
-                    headers: headers
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-
-                if (result.success) {
-                    processingResult = result;
-                    showResults(result);
-                } else {
-                    throw new Error(result.error || 'Processing failed');
-                }
-
-            } catch (error) {
-                console.error('Processing error:', error);
-                showAlert('Processing failed: ' + error.message, 'error');
-                resetProcessing();
-            }
-        }
-
-        function startProcessingAnimation() {
-            const steps = ['step1', 'step2', 'step3', 'step4', 'step5'];
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            const statusEl = document.getElementById('processingStatus');
-            
-            let currentStep = 0;
-            let progress = 0;
-
-            const stepMessages = [
-                'Analyzing audio characteristics and format...',
-                'Detecting languages using AI models...',
-                'Scanning for inappropriate content...',
-                'Reconstructing clean audio...',
-                'Optimizing quality and applying enhancements...'
-            ];
-
-            const interval = setInterval(() => {
-                // Update progress
-                progress = Math.min(95, progress + Math.random() * 15);
-                progressFill.style.width = progress + '%';
-                progressText.textContent = `${Math.round(progress)}% • Processing...`;
-
-                // Update steps
-                if (currentStep < steps.length && progress > (currentStep + 1) * 18) {
-                    // Complete previous step
-                    if (currentStep > 0) {
-                        const prevStep = document.getElementById(steps[currentStep - 1]);
-                        prevStep.classList.remove('active');
-                        prevStep.classList.add('completed');
-                    }
-
-                    // Activate current step
-                    const step = document.getElementById(steps[currentStep]);
-                    step.classList.add('active');
-                    statusEl.textContent = stepMessages[currentStep];
-
-                    // Show language detection
-                    if (currentStep === 1) {
-                        setTimeout(() => {
-                            document.getElementById('detectedLanguages').classList.remove('hidden');
-                            simulateLanguageDetection();
-                        }, 1000);
-                    }
-
-                    currentStep++;
-                }
-
-                // Complete processing
-                if (progress >= 95) {
-                    clearInterval(interval);
-                    completeProcessing();
-                }
-            }, 300);
-        }
-
-        function simulateLanguageDetection() {
-            const languagesList = document.getElementById('languagesList');
-            const languages = ['English', 'Spanish', 'French'];
-            
-            languagesList.innerHTML = '';
-            languages.forEach((lang, index) => {
-                setTimeout(() => {
-                    const badge = document.createElement('span');
-                    badge.className = 'format-tag';
-                    badge.textContent = lang;
-                    badge.style.animation = 'slideInRight 0.3s ease-out';
-                    languagesList.appendChild(badge);
-                }, index * 500);
-            });
-        }
-
-        function completeProcessing() {
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            const statusEl = document.getElementById('processingStatus');
-
-            // Complete all steps
-            ['step1', 'step2', 'step3', 'step4', 'step5'].forEach(stepId => {
-                const step = document.getElementById(stepId);
-                step.classList.remove('active');
-                step.classList.add('completed');
-            });
-
-            progressFill.style.width = '100%';
-            progressText.textContent = '100% • Processing complete!';
-            statusEl.textContent = 'Audio cleaning completed successfully!';
-
-            // Hide processing after a delay
-            setTimeout(() => {
-                document.getElementById('processingSection').classList.remove('active');
-            }, 1500);
-        }
-
-        function showResults(result) {
-            // Setup audio player
-            if (result.previewUrl) {
-                const player = document.getElementById('previewPlayer');
-                player.src = result.previewUrl;
-                player.style.display = 'block';
-            }
-
-            // Show results section
-            document.getElementById('resultsSection').classList.add('active');
-            
-            // Track event
-            trackEvent('processing_complete', {
-                planType: currentPlan,
-                fileSize: currentFile?.size,
-                languages: result.languages,
-                profanityFound: result.profanityFound
-            });
-        }
-
-        function showPricing() {
-            document.getElementById('pricingSection').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        async function selectPlan(planType, priceId) {
-            if (!currentFile) {
-                showAlert('Please upload an audio file first', 'warning');
-                document.getElementById('uploadArea').scrollIntoView({ behavior: 'smooth' });
-                return;
-            }
-
-            try {
-                const response = await fetch(`${CONFIG.API_BASE}/create-payment`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        priceId: priceId,
-                        type: planType,
-                        fileName: currentFile.name,
-                        fingerprint: userFingerprint
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-
-                if (result.success) {
-                    // Track event
-                    trackEvent('payment_initiated', {
-                        planType: planType,
-                        priceId: priceId,
-                        sessionId: result.sessionId
-                    });
-
-                    // Redirect to Stripe Checkout
-                    window.location.href = result.url;
-                } else {
-                    throw new Error(result.error || 'Payment creation failed');
-                }
-
-            } catch (error) {
-                console.error('Payment error:', error);
-                showAlert('Payment setup failed: ' + error.message, 'error');
-            }
-        }
-
-        async function handlePaymentSuccess(sessionId) {
-            if (!sessionId) return;
-
-            try {
-                // Activate access
-                const response = await fetch(`${CONFIG.API_BASE}/activate-access`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        fingerprint: userFingerprint,
-                        sessionId: sessionId
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showAlert('Payment successful! You now have access to the full version.', 'success');
-                    
-                    // Redirect to download page or provide download link
-                    const downloadUrl = `${CONFIG.API_BASE}/download-page?session_id=${sessionId}`;
-                    
-                    setTimeout(() => {
-                        window.location.href = downloadUrl;
-                    }, 2000);
-                } else {
-                    showAlert('Payment was successful, but activation failed. Please contact support.', 'warning');
-                }
-
-            } catch (error) {
-                console.error('Activation error:', error);
-                showAlert('Payment successful, but activation failed. Please contact support.', 'warning');
-            }
-        }
-
-        function resetProcessing() {
-            document.getElementById('processingSection').classList.remove('active');
-            document.getElementById('resultsSection').classList.remove('active');
-            document.querySelector('.upload-section').style.opacity = '1';
-        }
-
-        function showAlert(message, type = 'success') {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type}`;
-            alertDiv.textContent = message;
-
-            document.body.appendChild(alertDiv);
-
-            // Auto remove after 5 seconds
-            setTimeout(() => {
-                alertDiv.remove();
-            }, 5000);
-
-            // Make it clickable to dismiss
-            alertDiv.addEventListener('click', () => alertDiv.remove());
-        }
-
-        function generateFingerprint() {
-            let fingerprint = localStorage.getItem('fwea_fingerprint');
-            if (!fingerprint) {
-                fingerprint = Date.now().toString(36) + Math.random().toString(36).substring(2);
-                localStorage.setItem('fwea_fingerprint', fingerprint);
-            }
-            return fingerprint;
-        }
-
-        async function trackEvent(eventName, data = {}) {
-            try {
-                await fetch(`${CONFIG.API_BASE}/track-event`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        event: eventName,
-                        fingerprint: userFingerprint,
-                        data: data,
-                        timestamp: Date.now(),
-                        url: window.location.href,
-                        userAgent: navigator.userAgent
-                    })
-                });
-            } catch (error) {
-                console.warn('Event tracking failed:', error);
-            }
-        }
-
-        // Admin functions
-        function checkAdminStatus() {
-            const adminToken = localStorage.getItem('adminToken');
-            if (adminToken) {
-                isAdmin = true;
-                document.getElementById('adminStatus').textContent = 'Admin mode active';
-                document.getElementById('adminToken').value = '••••••••';
-            }
-        }
-
-        async function adminLogin() {
-            const token = document.getElementById('adminToken').value;
-            if (!token) return;
-
-            try {
-                const response = await fetch(`${CONFIG.API_BASE}/debug-env`, {
-                    headers: {
-                        'X-FWEA-Admin': token
-                    }
-                });
-
-                if (response.ok) {
-                    localStorage.setItem('adminToken', token);
-                    isAdmin = true;
-                    document.getElementById('adminStatus').textContent = 'Admin login successful';
-                    document.getElementById('adminToken').value = '••••••••';
-                    showAlert('Admin access granted', 'success');
-                } else {
-                    throw new Error('Invalid token');
-                }
-            } catch (error) {
-                document.getElementById('adminStatus').textContent = 'Invalid token';
-                showAlert('Admin login failed', 'error');
-            }
-        }
-
-        // Track initial page load
-        trackEvent('page_load', {
-            timestamp: Date.now(),
-            userAgent: navigator.userAgent,
-            referrer: document.referrer
-        });
-    </script>
+        currentStep++;
+      }
+
+      if (progress >= 95) { clearInterval(interval); completeProcessing(); }
+    }, 300);
+  }
+
+  function simulateLanguageDetection() {
+    const languagesList = document.getElementById('languagesList');
+    const languages = ['English', 'Spanish', 'French'];
+    languagesList.innerHTML = '';
+    languages.forEach((lang, i) => {
+      setTimeout(() => {
+        const badge = document.createElement('span');
+        badge.className = 'format-tag';
+        badge.textContent = lang;
+        badge.style.animation = 'slideInRight 0.3s ease-out';
+        languagesList.appendChild(badge);
+      }, i * 500);
+    });
+  }
+
+  function completeProcessing() {
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const statusEl = document.getElementById('processingStatus');
+
+    ['step1','step2','step3','step4','step5'].forEach(id => {
+      const s = document.getElementById(id);
+      s.classList.remove('active'); s.classList.add('completed');
+    });
+
+    progressFill.style.width = '100%';
+    progressText.textContent = '100% • Processing complete!';
+    statusEl.textContent = 'Audio cleaning completed successfully!';
+
+    setTimeout(() => document.getElementById('processingSection').classList.remove('active'), 1500);
+  }
+
+  function showResults(result) {
+    if (result.previewUrl) {
+      const player = document.getElementById('previewPlayer');
+      player.src = result.previewUrl;
+      player.style.display = 'block';
+    }
+    document.getElementById('resultsSection').classList.add('active');
+    trackEvent('processing_complete', {
+      planType: currentPlan,
+      fileSize: currentFile?.size,
+      languages: result.languages,
+      profanityFound: result.profanityFound
+    });
+  }
+
+  function showPricing() {
+    document.getElementById('pricingSection').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // --- Payments (unchanged) ---
+  async function selectPlan(planType, priceId) {
+    if (!currentFile) {
+      showAlert('Please upload an audio file first', 'warning');
+      document.getElementById('uploadArea').scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    try {
+      const resp = await fetch(`${CONFIG.API_BASE}/create-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, type: planType, fileName: currentFile.name, fingerprint: userFingerprint })
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      const result = await resp.json();
+      if (result.success) {
+        trackEvent('payment_initiated', { planType, priceId, sessionId: result.sessionId });
+        window.location.href = result.url;
+      } else {
+        throw new Error(result.error || 'Payment creation failed');
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+      showAlert('Payment setup failed: ' + err.message, 'error');
+    }
+  }
+
+  async function handlePaymentSuccess(sessionId) {
+    if (!sessionId) return;
+    try {
+      const resp = await fetch(`${CONFIG.API_BASE}/activate-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fingerprint: userFingerprint, sessionId })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        showAlert('Payment successful! You now have access to the full version.', 'success');
+        const downloadUrl = `${CONFIG.API_BASE}/download-page?session_id=${sessionId}`;
+        setTimeout(() => { window.location.href = downloadUrl; }, 2000);
+      } else {
+        showAlert('Payment was successful, but activation failed. Please contact support.', 'warning');
+      }
+    } catch {
+      showAlert('Payment successful, but activation failed. Please contact support.', 'warning');
+    }
+  }
+
+  // --- Misc / utils ---
+  function resetProcessing() {
+    document.getElementById('processingSection').classList.remove('active');
+    document.getElementById('resultsSection').classList.remove('active');
+    document.querySelector('.upload-section').style.opacity = '1';
+  }
+
+  function showAlert(message, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `alert alert-${type}`;
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+    el.addEventListener('click', () => el.remove());
+  }
+
+  function generateFingerprint() {
+    let fp = localStorage.getItem('fwea_fingerprint');
+    if (!fp) {
+      fp = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      localStorage.setItem('fwea_fingerprint', fp);
+    }
+    return fp;
+  }
+
+  async function trackEvent(event, data = {}) {
+    try {
+      await fetch(`${CONFIG.API_BASE}/track-event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event, fingerprint: userFingerprint, data, timestamp: Date.now(), url: window.location.href, userAgent: navigator.userAgent })
+      });
+    } catch { /* non-blocking */ }
+  }
+
+  function checkAdminStatus() {
+    const tok = localStorage.getItem('adminToken');
+    if (tok) {
+      isAdmin = true;
+      document.getElementById('adminStatus').textContent = 'Admin mode active';
+      document.getElementById('adminToken').value = '••••••••';
+    }
+  }
+
+  async function adminLogin() {
+    const token = document.getElementById('adminToken').value;
+    if (!token) return;
+    try {
+      const resp = await fetch(`${CONFIG.API_BASE}/debug-env`, { headers: { 'X-FWEA-Admin': token } });
+      if (resp.ok) {
+        localStorage.setItem('adminToken', token);
+        isAdmin = true;
+        document.getElementById('adminStatus').textContent = 'Admin login successful';
+        document.getElementById('adminToken').value = '••••••••';
+        showAlert('Admin access granted', 'success');
+      } else {
+        throw new Error('Invalid token');
+      }
+    } catch {
+      document.getElementById('adminStatus').textContent = 'Invalid token';
+      showAlert('Admin login failed', 'error');
+    }
+  }
+
+  // Track initial page load
+  trackEvent('page_load', { timestamp: Date.now(), userAgent: navigator.userAgent, referrer: document.referrer });
+</script>
 </body>
 </html>
