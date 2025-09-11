@@ -239,7 +239,19 @@ export default {
             }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         }
-
+        case '/transcribe': {
+          if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+          try {
+            const form = await request.formData();
+            const file = form.get('audio');
+            if (!file) return new Response(JSON.stringify({ error: 'missing audio' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            const buf = await file.arrayBuffer();
+            const t = await runTranscriptionAllVariants(buf, env);
+            return new Response(JSON.stringify({ success: true, transcription: t }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          } catch (e) {
+            return new Response(JSON.stringify({ success: false, error: 'transcription_failed' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
         case '/debug-audio': {
           if (!isAdminRequest(request, env)) {
             return new Response('Forbidden', { status: 403, headers: corsHeaders });
@@ -381,7 +393,27 @@ export default {
       );
     }
   },
+
+  async queue(batch, env) {
+    if (!env.TRANSCODER_URL) { for (const m of batch.messages) m.ack(); return; }
+    for (const m of batch.messages) {
+      try {
+        await fetch(env.TRANSCODER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(m.body || {})
+      });
+      m.ack();
+    } catch (e) {
+      console.warn('queue push failed', e?.message || e);
+      m.retry();
+    }
+  }
+}
 };
+
+
+
 
 /* =========================
    Helpers — signing & range
@@ -1117,6 +1149,18 @@ function removeProfanityFromText(text, languages) {
   return (text || '').replace(/\b(fuck|shit|damn|hell|bitch|ass|crap|piss)\b/gi, '[CLEANED]');
 }
 
+async function runTranscriptionAllVariants(buffer, env) {
+  const out = { primary: null, variants: [] };
+  try {
+    if (!env?.AI || typeof env.AI.run !== 'function') return out;
+    const CAP = 5 * 1024 * 1024;
+    const slice = buffer.byteLength > CAP ? buffer.slice(0, CAP) : buffer;
+    const base = await env.AI.run('@cf/openai/whisper', { audio: [...new Uint8Array(slice)] }).catch(()=>null);
+    if (base) out.primary = base;
+    return out;
+  } catch { return out; }
+}
+
 /* =========================
    PREVIEW/TRIMMING + FULL OUTPUT
    ========================= */
@@ -1135,8 +1179,29 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
   // Absolute base URL for signed links
   const base = (resolvedBase && resolvedBase.trim()) || getWorkerBase(env, request);
 
-  // (A) PREVIEW: watermark + hard-cut to exact previewDuration (bytes approximation by bitrate)
-  const watermarkedPreview = await addAudioWatermark(audioBuffer, watermarkId);
+ // (A) PREVIEW: always clean and exact length
+let previewWork = audioBuffer;
+const profanityInWindow = (profanityResults && Array.isArray(profanityResults.timestamps))
+  ? profanityResults.timestamps.some(w => Number.isFinite(w.start) && w.start < (previewDuration || 0))
+  : false;
+
+if (isLikelyWav(previewWork)) {
+  const muted = await processFullAudio(previewWork, profanityResults, planType);
+  previewWork = trimWavToSeconds(muted, previewDuration);
+} else {
+  // If we can't surgically mute (compressed), guarantee cleanliness:
+  if (profanityInWindow) {
+    previewWork = generateSilentWav(previewDuration);
+    mime = 'audio/wav';
+  } else {
+    // No profanity in preview window → fast approximate trim by bitrate
+    const bps = bytesPerSecondFromBitrate(getBitrateForPlan('free'));
+    const capBytes = Math.min(previewWork.byteLength, Math.max(1, previewDuration * bps));
+    previewWork = previewWork.slice(0, capBytes);
+  }
+}
+const watermarkedPreview = await addAudioWatermark(previewWork, watermarkId);
+  
 
   const extByMime = {
     'audio/mpeg': 'mp3',
@@ -1183,26 +1248,46 @@ async function generateAudioOutputs(audioBuffer, profanityResults, planType, pre
     ? `${base}/audio/${encodeURIComponent(previewKey)}?exp=${pexp}&sig=${psig}`
     : `${base}/audio/${encodeURIComponent(previewKey)}`;
 
-  // (B) FULL (only for non-free): mute profanity in WAV; passthrough other codecs
-  let fullAudioUrl = null;
-  if (planType !== 'free') {
+ 
+// (B) FULL clean output (only for non-free)
+let fullAudioUrl = null;
+if (planType !== 'free') {
+  const fullKey = `full/${generateProcessId()}_full.${guessedExt}`;
+  if (isLikelyWav(audioBuffer)) {
     const processedAudio = await processFullAudio(audioBuffer, profanityResults, planType);
     const watermarkedFull = await addAudioWatermark(processedAudio, watermarkId);
-
-    const fullKey = `full/${generateProcessId()}_full.${guessedExt}`;
     try {
       await env.AUDIO_STORAGE.put(fullKey, watermarkedFull, {
         httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'private, max-age=7200' },
-        customMetadata: { plan: planType, watermarkId, fingerprint, originalName }
+        customMetadata: { plan: planType, watermarkId, fingerprint, originalName, transcoded: 'false', clean: 'true' }
       });
     } catch (e) {
       console.warn('R2 put full failed:', e?.message || e);
     }
-
-    const { exp: fexp, sig: fsig } = await signR2Key(fullKey, env, 60 * 60);
-    fullAudioUrl = fsig
-      ? `${base}/audio/${encodeURIComponent(fullKey)}?exp=${fexp}&sig=${fsig}`
-      : `${base}/audio/${encodeURIComponent(fullKey)}`;
+  } else {
+    // Placeholder + queue → external transcoder will clean and overwrite this key
+    try {
+      await env.AUDIO_STORAGE.put(fullKey, new Uint8Array(), {
+        httpMetadata: { contentType: mime || 'application/octet-stream', cacheControl: 'private, max-age=300' },
+        customMetadata: { plan: planType, watermarkId, fingerprint, originalName, transcoded: 'pending', clean: 'pending' }
+      });
+    } catch (e) { console.warn('R2 placeholder full failed:', e?.message || e); }
+    if (env.TRANSCODE_QUEUE) {
+      const job = {
+        kind: 'full',
+        r2OutKey: fullKey,
+        mime,
+        fingerprint,
+        originalName,
+        profanity: (profanityResults && profanityResults.timestamps) || []
+      };
+      try { await env.TRANSCODE_QUEUE.send(job); } catch (e) { console.warn('enqueue full transcode failed', e?.message || e); }
+    }
+  }
+  const { exp: fexp, sig: fsig } = await signR2Key(fullKey, env, 60 * 60);
+  fullAudioUrl = fsig
+    ? `${base}/audio/${encodeURIComponent(fullKey)}?exp=${fexp}&sig=${fsig}`
+    : `${base}/audio/${encodeURIComponent(fullKey)}`;
   }
 
   console.log('Generated URLs', { previewUrl, fullAudioUrl, base });
@@ -1326,6 +1411,164 @@ function bytesPerSecondFromBitrate(bitrateStr) {
   const kbps = m ? parseInt(m[1], 10) : 128;
   // kbps -> bytes/s
   return Math.max(1, Math.floor((kbps * 1000) / 8));
+}
+
+function isLikelyWav(buffer) {
+  if (!buffer || buffer.byteLength < 12) return false;
+  const dv = new DataView(buffer);
+  return dv.getUint32(0, false) === 0x52494646 /* 'RIFF' */ &&
+         dv.getUint32(8, false) === 0x57415645 /* 'WAVE' */;
+}
+
+function trimWavToSeconds(buffer, seconds) {
+  try {
+    if (!isLikelyWav(buffer)) return buffer;
+    const dv = new DataView(buffer);
+    let offset = 12, fmtOffset = -1, fmtSize = 0, dataOffset = -1, dataSize = 0;
+    while (offset + 8 <= dv.byteLength) {
+      const id = dv.getUint32(offset, false);
+      const sz = dv.getUint32(offset + 4, true);
+      if (id === 0x666d7420) { fmtOffset = offset + 8; fmtSize = sz; }
+      if (id === 0x64617461) { dataOffset = offset + 8; dataSize = sz; break; }
+      offset += 8 + sz + (sz & 1);
+    }
+    if (fmtOffset < 0 || dataOffset < 0) return buffer;
+    const numChannels = dv.getUint16(fmtOffset + 2, true);
+    const sampleRate  = dv.getUint32(fmtOffset + 4, true);
+    const bitsPerSample = dv.getUint16(fmtOffset + 14, true);
+    if (!sampleRate || !numChannels) return buffer;
+
+    const bytesPerSample = bitsPerSample / 8;
+    const frameSize = bytesPerSample * numChannels;
+    const framesToKeep = Math.max(0, Math.floor(seconds * sampleRate));
+    const bytesToKeep  = Math.min(framesToKeep * frameSize, dataSize);
+
+    const headerSize = dataOffset;
+    const out = new Uint8Array(8 + headerSize + bytesToKeep);
+    // 'RIFF'
+    out[0]=0x52; out[1]=0x49; out[2]=0x46; out[3]=0x46;
+    const chunkSize = 4 + (8 + fmtSize) + (8 + bytesToKeep);
+    new DataView(out.buffer).setUint32(4, chunkSize, true);
+    // 'WAVE'
+    out[8]=0x57; out[9]=0x41; out[10]=0x56; out[11]=0x45;
+    // copy fmt chunk
+    out.set(new Uint8Array(buffer.slice(12, 12 + 8 + fmtSize)), 12);
+    let o = 12 + 8 + fmtSize;
+    // 'data'
+    out[o+0]=0x64; out[o+1]=0x61; out[o+2]=0x74; out[o+3]=0x61;
+    new DataView(out.buffer).setUint32(o+4, bytesToKeep, true);
+    o += 8;
+    out.set(new Uint8Array(buffer, dataOffset, bytesToKeep), o);
+    return out.buffer;
+  } catch {
+    return buffer;
+  }
+}
+
+function generateSilentWav(seconds, sampleRate = 44100, channels = 2, bitsPerSample = 16) {
+  const frames = Math.max(0, Math.floor(seconds * sampleRate));
+  const bytesPerSample = bitsPerSample / 8;
+  const blockAlign = channels * bytesPerSample;
+  const dataSize = frames * blockAlign;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const dv = new DataView(buffer);
+  // RIFF header
+  dv.setUint32(0, 0x52494646, false);
+  dv.setUint32(4, 36 + dataSize, true);
+  dv.setUint32(8, 0x57415645, false); // 'WAVE'
+  // fmt chunk
+  dv.setUint32(12, 0x666d7420, false); // 'fmt '
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true);  // PCM
+  dv.setUint16(22, channels, true);
+  dv.setUint32(24, sampleRate, true);
+  dv.setUint32(28, sampleRate * blockAlign, true);
+  dv.setUint16(32, blockAlign, true);
+  dv.setUint16(34, bitsPerSample, true);
+  // data chunk
+  dv.setUint32(36, 0x64617461, false); // 'data'
+  dv.setUint32(40, dataSize, true);
+  // zeros body = silence
+  return buffer;
+}
+
+function isLikelyWav(buffer) {
+  if (!buffer || buffer.byteLength < 12) return false;
+  const dv = new DataView(buffer);
+  return dv.getUint32(0, false) === 0x52494646 /* 'RIFF' */ &&
+         dv.getUint32(8, false) === 0x57415645 /* 'WAVE' */;
+}
+
+function trimWavToSeconds(buffer, seconds) {
+  try {
+    if (!isLikelyWav(buffer)) return buffer;
+    const dv = new DataView(buffer);
+    let offset = 12, fmtOffset = -1, fmtSize = 0, dataOffset = -1, dataSize = 0;
+    while (offset + 8 <= dv.byteLength) {
+      const id = dv.getUint32(offset, false);
+      const sz = dv.getUint32(offset + 4, true);
+      if (id === 0x666d7420) { fmtOffset = offset + 8; fmtSize = sz; }
+      if (id === 0x64617461) { dataOffset = offset + 8; dataSize = sz; break; }
+      offset += 8 + sz + (sz & 1);
+    }
+    if (fmtOffset < 0 || dataOffset < 0) return buffer;
+    const numChannels = dv.getUint16(fmtOffset + 2, true);
+    const sampleRate  = dv.getUint32(fmtOffset + 4, true);
+    const bitsPerSample = dv.getUint16(fmtOffset + 14, true);
+    if (!sampleRate || !numChannels) return buffer;
+
+    const bytesPerSample = bitsPerSample / 8;
+    const frameSize = bytesPerSample * numChannels;
+    const framesToKeep = Math.max(0, Math.floor(seconds * sampleRate));
+    const bytesToKeep  = Math.min(framesToKeep * frameSize, dataSize);
+
+    const headerSize = dataOffset;
+    const out = new Uint8Array(8 + headerSize + bytesToKeep);
+    // 'RIFF'
+    out[0]=0x52; out[1]=0x49; out[2]=0x46; out[3]=0x46;
+    const chunkSize = 4 + (8 + fmtSize) + (8 + bytesToKeep);
+    new DataView(out.buffer).setUint32(4, chunkSize, true);
+    // 'WAVE'
+    out[8]=0x57; out[9]=0x41; out[10]=0x56; out[11]=0x45;
+    // copy fmt chunk
+    out.set(new Uint8Array(buffer.slice(12, 12 + 8 + fmtSize)), 12);
+    let o = 12 + 8 + fmtSize;
+    // 'data'
+    out[o+0]=0x64; out[o+1]=0x61; out[o+2]=0x74; out[o+3]=0x61;
+    new DataView(out.buffer).setUint32(o+4, bytesToKeep, true);
+    o += 8;
+    out.set(new Uint8Array(buffer, dataOffset, bytesToKeep), o);
+    return out.buffer;
+  } catch {
+    return buffer;
+  }
+}
+
+function generateSilentWav(seconds, sampleRate = 44100, channels = 2, bitsPerSample = 16) {
+  const frames = Math.max(0, Math.floor(seconds * sampleRate));
+  const bytesPerSample = bitsPerSample / 8;
+  const blockAlign = channels * bytesPerSample;
+  const dataSize = frames * blockAlign;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const dv = new DataView(buffer);
+  // RIFF header
+  dv.setUint32(0, 0x52494646, false);
+  dv.setUint32(4, 36 + dataSize, true);
+  dv.setUint32(8, 0x57415645, false); // 'WAVE'
+  // fmt chunk
+  dv.setUint32(12, 0x666d7420, false); // 'fmt '
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true);  // PCM
+  dv.setUint16(22, channels, true);
+  dv.setUint32(24, sampleRate, true);
+  dv.setUint32(28, sampleRate * blockAlign, true);
+  dv.setUint16(32, blockAlign, true);
+  dv.setUint16(34, bitsPerSample, true);
+  // data chunk
+  dv.setUint32(36, 0x64617461, false); // 'data'
+  dv.setUint32(40, dataSize, true);
+  // zeros body = silence
+  return buffer;
 }
 
 /* =========================
