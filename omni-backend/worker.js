@@ -228,7 +228,7 @@ export default {
       console.error('Worker Error:', error);
       return json({ error: 'Internal Server Error', details: error.message, requestId: crypto.randomUUID() }, 500, corsHeaders);
     }
-  },
+  
 };
 
 // ---------- Stripe IDs ----------
