@@ -179,22 +179,33 @@ async function route(request, env, ctx) {
   const url = new URL(request.url);
 
   // CORS
-  const allowList = [
-    env.FRONTEND_URL?.replace(/\/+$/,""),
-    "https://fwea-i.com",
-    "https://www.fwea-i.com",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000"
-  ].filter(Boolean);
-  const reqOrigin = request.headers.get("Origin") || "";
-  const allowOrigin = allowList.includes(reqOrigin) ? reqOrigin : "";
-  const cors = {
-    "Access-Control-Allow-Origin": allowOrigin || "*",
-    "Vary": "Origin",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With",
-    "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified",
-    "Access-Control-Max-Age": "86400"
+const allowList = [
+  // env vars (trim any trailing slash)
+  env.FRONTEND_URL && env.FRONTEND_URL.replace(/\/+$/, ''),
+  env.WIX_SITE_URL && env.WIX_SITE_URL.replace(/\/+$/, ''),
+
+  // explicit origins you’re using
+  'https://omni2-8d2.pages.dev',
+  'https://fwea-i.com',
+  'https://www.fwea-i.com',
+
+  // local dev
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+].filter(Boolean);
+
+const reqOrigin  = request.headers.get('Origin') || '';
+const allowOrigin = allowList.includes(reqOrigin) ? reqOrigin : '';
+const cors = {
+  'Access-Control-Allow-Origin': allowOrigin || '*',
+  'Vary': 'Origin',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers':
+    'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
+  'Access-Control-Expose-Headers':
+    'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified',
+  'Access-Control-Max-Age': '86400',
+};
   };
 
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
