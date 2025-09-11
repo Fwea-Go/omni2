@@ -180,7 +180,10 @@ export default {
     if (allowOrigin !== workerOrigin && isAllowed) corsHeaders['Access-Control-Allow-Credentials'] = 'true';
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+
     const url = new URL(request.url);
+
+
 
     // Audio streaming
     if (url.pathname.startsWith('/audio/')) return handleAudioDownload(request, env, corsHeaders);
