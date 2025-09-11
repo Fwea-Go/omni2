@@ -1,103 +1,167 @@
-async function processAudioWithAI(audioFile, planType, fingerprint, env, request) {
-  try {
-    // Read file bytes
-    const audioBuffer = await audioFile.arrayBuffer();
+name = "omnibackend2"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
-    // --- Transcribe with Cloudflare Workers AI Whisper ---
-    const whisper = await transcribeWithWorkersAI(audioBuffer, env);
+# ---------- Shared defaults ----------
+[vars]
+# Intentionally empty to prevent root vars from overriding per-env settings.
+# Set FRONTEND_URL, WORKER_BASE_URL, and ENVIRONMENT inside each [env.*.vars] block below.
 
-    // Normalize transcription shape
-    const transcription = {
-      text: whisper.text || whisper.transcript || '',
-      language: (whisper.language || whisper.detected_language || 'auto'),
-      segments: Array.isArray(whisper.segments) ? whisper.segments.map(s => ({
-        start: Number(s.start ?? s.start_time ?? 0),
-        end: Number(s.end ?? s.end_time ?? (s.start ?? 0) + 1),
-        text: String(s.text ?? ''),
-        confidence: Number(s.confidence ?? 0.9)
-      })) : [{ start: 0, end: Math.min(60, Math.ceil(audioBuffer.byteLength / (44100*2))), text: String(whisper.text || ''), confidence: 0.9 }]
-    };
+# ---- KV (Cache) ----
+[[kv_namespaces]]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
-    const detectedLanguages = extractLanguagesFromTranscription(transcription.text);
-    const normalizedLanguages = normalizeLangs([transcription.language, ...detectedLanguages]);
+# ---- D1 Database ----
+[[d1_databases]]
+binding = "DB"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
 
-    // Profanity detection over segments
-    const profanityResults = await findProfanityTimestamps(transcription, normalizedLanguages, env);
+# ---- R2 Bucket (audio) ----
+[[r2_buckets]]
+binding = "AUDIO_STORAGE"
+bucket_name = "fwea-audio-files"
 
-    // Produce preview/full audio objects in R2 and signed links
-    const audioOutputs = await generateAudioOutputs(
-      audioBuffer,
-      profanityResults,
-      planType,
-      getPreviewDuration(planType),
-      fingerprint,
-      env,
-      audioFile.type,
-      audioFile.name,
-      request
-    );
+# ---- Workers AI ----
+[ai]
+binding = "AI"
 
-    return {
-      success: true,
-      previewUrl: audioOutputs.previewUrl,
-      fullAudioUrl: audioOutputs.fullAudioUrl,
-      languages: normalizedLanguages,
-      profanityFound: profanityResults.timestamps?.length || 0,
-      transcription: planType !== 'free' ? transcription : null,
-      quality: getQualityForPlan(planType),
-      watermarkId: audioOutputs.watermarkId
-    };
-  } catch (error) {
-    console.error('AI processing error:', error);
-    return { success: false, error: 'AI processing failed', details: error.message };
-  }
-}
+# ---- Analytics Engine ----
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "omni_analytics"
 
-async function transcribeWithWorkersAI(audioBuffer, env) {
-  // Workers AI binding must exist in wrangler.toml as: [ai] binding = "AI"
-  if (!env.AI || !env.AI.run) {
-    throw new Error('Workers AI binding not configured (missing [ai] binding = "AI")');
-  }
+# ---- Durable Objects ----
+[[durable_objects.bindings]]
+name = "PROCESSING_STATE_V2"
+class_name = "ProcessingStateV2"
 
-  // Model name: use Cloudflare Whisper; fall back aliases for compatibility
-  const models = [
-    '@cf/openai/whisper',          // primary
-    '@cf/openai/whisper-1',        // alias some accounts expose
-    '@cf/openai/whisper-large-v3'  // legacy alias
-  ];
+# ---- Durable Object migrations ----
+[[migrations]]
+tag = "v1"
+new_classes = ["ProcessingStateV2"]
 
-  // Convert to ArrayBuffer -> Uint8Array for model input
-  const bytes = new Uint8Array(audioBuffer);
+[build]
+command = ""
 
-  let lastErr;
-  for (const model of models) {
-    try {
-      const result = await env.AI.run(model, {
-        // Most Workers AI audio models accept raw PCM/encoded bytes as `audio` or `audio_file`.
-        // Provide both keys for broader compatibility.
-        audio: [...bytes],
-        audio_file: [...bytes],
-        // Helpful flags; models ignore unknown keys safely.
-        detect_language: true,
-        temperature: 0
-      });
+[placement]
+mode = "smart"
 
-      // Expected shapes: { text, language, segments } or nested under result
-      if (!result) throw new Error('Empty response from Workers AI');
-      const r = (result.result || result);
-      if (typeof r.text === 'string' || Array.isArray(r.segments)) return r;
+# ================== DEVELOPMENT ==================
+[env.development]
+[env.development.vars]
+ENVIRONMENT   = "development"
+FRONTEND_URL  = "http://localhost:3000"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"   # override with wrangler secret put in dev if needed
 
-      // Some deployments return { output: { text, segments } }
-      if (r.output && (typeof r.output.text === 'string' || Array.isArray(r.output.segments))) return r.output;
+[[env.development.kv_namespaces]]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
-      // Fallback: stringify and attempt to parse text
-      const asText = typeof r === 'string' ? r : (typeof r.text === 'string' ? r.text : '');
-      return { text: asText };
-    } catch (e) {
-      lastErr = e;
-      console.warn('Whisper model failed', model, e?.message || e);
-      continue;
-    }
-  }
-  throw lastErr || new Error('All Whisper model attempts failed');
-}
+[[env.development.kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "PROFANITY_LISTS_DEV_ID"
+
+[[env.development.r2_buckets]]
+binding = "AUDIO_STORAGE"
+bucket_name = "fwea-audio-files"
+
+[env.development.ai]
+binding = "AI"
+
+[[env.development.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "omni_analytics"
+
+[[env.development.durable_objects.bindings]]
+name = "PROCESSING_STATE_V2"
+class_name = "ProcessingStateV2"
+
+# ================== PREVIEW ==================
+[env.preview]
+[env.preview.vars]
+ENVIRONMENT   = "preview"
+FRONTEND_URL  = "https://omni2-8d2.pages.dev"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+
+[[env.preview.kv_namespaces]]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
+
+[[env.preview.kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "PROFANITY_LISTS_DEV_ID"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+
+[[env.preview.r2_buckets]]
+binding = "AUDIO_STORAGE"
+bucket_name = "fwea-audio-files"
+
+[env.preview.ai]
+binding = "AI"
+
+[[env.preview.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "omni_analytics"
+
+[[env.preview.durable_objects.bindings]]
+name = "PROCESSING_STATE_V2"
+class_name = "ProcessingStateV2"
+
+# ================== PRODUCTION ==================
+[env.production]
+[env.production.vars]
+ENVIRONMENT   = "production"
+FRONTEND_URL  = "https://fwea-i.com"
+WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+# Required secrets in prod (set with wrangler secret put --env production):
+#   STRIPE_SECRET_KEY
+#   AUDIO_URL_SECRET
+#   ADMIN_API_TOKEN
+#   STRIPE_WEBHOOK_SECRET
+
+[[env.production.kv_namespaces]]
+binding = "CACHE"
+id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
+
+[[env.production.kv_namespaces]]
+binding = "PROFANITY_LISTS"
+id = "PROFANITY_LISTS_PROD_ID"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "omnidb"
+database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
+
+[[env.production.r2_buckets]]
+binding = "AUDIO_STORAGE"
+bucket_name = "fwea-audio-files"
+
+[env.production.ai]
+binding = "AI"
+
+[[env.production.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "omni_analytics"
+
+[[env.production.durable_objects.bindings]]
+name = "PROCESSING_STATE_V2"
+class_name = "ProcessingStateV2"
+
+# Optional: serve the API under your domain instead of *.workers.dev
+# [[env.production.routes]]
+# pattern = "fwea-i.com/api/*"
+# zone_name = "fwea-i.com"
+
+# ===== Helper commands =====
+# Deploy dev:        npx wrangler deploy --env development
+# Deploy preview:    npx wrangler deploy --env preview
+# Deploy production: npx wrangler deploy --env production
