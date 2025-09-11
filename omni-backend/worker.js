@@ -75,6 +75,37 @@ function json(body, status = 200, corsHeaders = {}) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
+async function callTranscriberWithFile(audioFile, env) {
+  if (!env.TRANSCRIBE_ENDPOINT) throw new Error('TRANSCRIBE_ENDPOINT not set');
+  const fd = new FormData();
+  // most FastAPI handlers expect "file"; keep "audio" too just in case
+  fd.set('file', audioFile, audioFile.name || 'audio.mp3');
+  fd.set('audio', audioFile, audioFile.name || 'audio.mp3');
+  if (env.ASR_MODEL)   fd.set('model',   env.ASR_MODEL);
+  if (env.ASR_COMPUTE) fd.set('compute', env.ASR_COMPUTE);
+
+  const resp = await fetch(env.TRANSCRIBE_ENDPOINT.replace(/\/+$/,'') + '/transcribe', {
+    method: 'POST',
+    body: fd,
+    headers: { 'X-API-Token': env.TRANSCRIBE_TOKEN || '' }
+  });
+
+  const ct = resp.headers.get('content-type') || '';
+  const isJSON = ct.includes('application/json');
+  const data = isJSON ? await resp.json().catch(() => ({})) : { text: await resp.text() };
+
+  if (!resp.ok) {
+    throw new Error(`Transcriber ${resp.status}: ${data?.detail || data?.error || JSON.stringify(data).slice(0,200)}`);
+  }
+  // expected: { text, language?, segments?[] }
+  if (!data || !data.text) throw new Error('Transcriber returned no text');
+  if (!Array.isArray(data.segments)) {
+    // best-effort single segment if API doesn’t send segments
+    data.segments = [{ start: 0, end: 30, text: String(data.text), confidence: 0.9 }];
+  }
+  return data;
+}
+
 // ---------- Enhanced Profanity Detection ----------
 const PROF_CACHE = new Map();
 async function getProfanityTrieFor(lang, env) {
@@ -251,40 +282,45 @@ async function handleTranscribe(request, env, corsHeaders) {
 }
 
 // ---------- /process-audio ----------
-async function handleAudioProcessing(request, env, corsHeaders) {
-  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
-
+async function processAudioWithAI(audioFile, planType, fingerprint, env, request) {
   try {
-    const formData = await request.formData();
-    const audioFile   = formData.get('audio');
-    const fingerprint = formData.get('fingerprint') || 'anonymous';
-    const planType    = formData.get('planType') || 'free';
-    const admin       = isAdminRequest(request, env);
-    const effectivePlan = admin ? 'studio_elite' : planType;
+    const audioBuffer = await audioFile.arrayBuffer();
 
-    if (!env.AUDIO_STORAGE) return json({ success:false, error:'Storage not configured', hint:'Bind R2 bucket' }, 503, corsHeaders);
-    if (!audioFile)        return json({ success:false, error:'No audio file provided', hint:'Send FormData field "audio"' }, 400, corsHeaders);
+    // ✅ CALL YOUR TRANSCRIBER
+    const transcription = await callTranscriberWithFile(audioFile, env);
+    // transcription: { text, language?, segments:[{start,end,text,confidence}] }
 
-    const maxSizes = { free: 50*1024*1024, single_track: 100*1024*1024, day_pass: 100*1024*1024, dj_pro: 200*1024*1024, studio_elite: 500*1024*1024 };
-    const maxSize = maxSizes[effectivePlan] || maxSizes.free;
-    if (audioFile.size > maxSize) {
-      return json({ success:false, error:'File too large', maxSize, currentSize: audioFile.size, upgradeRequired: effectivePlan==='free' }, 413, corsHeaders);
-    }
+    const detectedLanguages = extractLanguagesFromTranscription(transcription.text);
+    const normalizedLanguages = normalizeLangs(detectedLanguages);
+    const profanityResults = await findProfanityTimestamps(transcription, normalizedLanguages, env);
 
-    const processingResult = await processAudioWithAI(audioFile, effectivePlan, fingerprint, env, request);
+    const audioOutputs = await generateAudioOutputs(
+      audioBuffer,
+      profanityResults,
+      planType,
+      getPreviewDuration(planType),
+      fingerprint,
+      env,
+      audioFile.type,
+      audioFile.name,
+      request
+    );
 
-    if (env.DB) {
-      await storeProcessingResult(fingerprint, processingResult, env, planType);
-      await updateUsageStats(fingerprint, planType, audioFile.size, env);
-    }
-
-    return json({ success: true, ...processingResult }, 200, corsHeaders);
+    return {
+      success: true,
+      previewUrl: audioOutputs.previewUrl,
+      fullAudioUrl: audioOutputs.fullAudioUrl,
+      languages: normalizedLanguages,
+      profanityFound: profanityResults.timestamps?.length || 0,
+      transcription: planType !== 'free' ? transcription : null,
+      quality: getQualityForPlan(planType),
+      watermarkId: audioOutputs.watermarkId
+    };
   } catch (error) {
-    console.error('Audio processing error:', error);
-    return json({ success:false, error:'Audio processing failed', details:error.message }, 500, corsHeaders);
+    console.error('AI processing error:', error);
+    return { success:false, error:'AI processing failed', details:error.message };
   }
 }
-
 // ---------- /create-payment ----------
 async function handlePaymentCreation(request, env, corsHeaders) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
