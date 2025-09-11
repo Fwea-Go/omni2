@@ -402,9 +402,7 @@ async function handlePaymentCreation(request, env, corsHeaders) {
 }
 
 // ---------- AI (placeholder) ----------
-async function processAudioWithAI(audioFile, planType, fingerprint, env, request) {
-  try {
-    const audioBuffer = await audioFile.arrayBuffer();
+
 
     
 // NEW (real)
