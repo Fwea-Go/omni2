@@ -16,9 +16,9 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0a0a0f 0%, #15151f 100%);
             min-height: 100vh;
-            color: white;
+            color: #E5E7EB;
             overflow-x: hidden;
         }
 
@@ -550,7 +550,7 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 60px;
+            height: 56px;
             background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(10px);
             overflow: hidden;
@@ -586,9 +586,9 @@
 
         /* Footer */
         footer {
-            margin-top: 4rem;
-            padding: 1.5rem 0 70px 0; /* tighter gap above language banner */
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 2rem;
+            padding: 1rem 0 56px 0; /* tighter gap above language banner */
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .footer-content {
@@ -750,7 +750,7 @@
                     <div class="upload-icon">📁</div>
                     <div class="upload-text">Drag files here or click to browse</div>
                     <div class="upload-hint">Maximum file size varies by plan</div>
-                    <button type="button" class="choose-file-btn" onclick="document.getElementById('fileInput').click()">
+                    <button type="button" class="choose-file-btn" onclick="openFilePicker()">
                         📂 Choose Audio File
                     </button>
                     <div class="supported-formats">
@@ -1071,6 +1071,13 @@
             }
         }
 
+        function openFilePicker() {
+            const fileInput = document.getElementById('fileInput');
+            // Ensure the change event fires even when the same file is chosen repeatedly
+            fileInput.value = '';
+            fileInput.click();
+        }
+
         function setupEventListeners() {
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
@@ -1079,7 +1086,7 @@
             uploadArea.addEventListener('dragover', handleDragOver);
             uploadArea.addEventListener('dragleave', handleDragLeave);
             uploadArea.addEventListener('drop', handleDrop);
-            uploadArea.addEventListener('click', () => fileInput.click());
+            uploadArea.addEventListener('click', () => { fileInput.value = ''; fileInput.click(); });
 
             // File input
             fileInput.addEventListener('change', handleFileSelect);
