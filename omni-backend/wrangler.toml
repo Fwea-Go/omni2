@@ -1,4 +1,5 @@
 name = "omnibackend2"
+# change to "worker/worker.js" if the file is under /worker
 main = "worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -6,8 +7,7 @@ workers_dev = true
 
 # ---------- Shared defaults ----------
 [vars]
-# Intentionally empty to prevent root vars from overriding per-env settings.
-# Set FRONTEND_URL, WORKER_BASE_URL, and ENVIRONMENT inside each [env.*.vars] block below.
+# Keep empty so env-specific values below take precedence.
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
@@ -53,10 +53,16 @@ mode = "smart"
 # ================== DEVELOPMENT ==================
 [env.development]
 [env.development.vars]
-ENVIRONMENT   = "development"
-FRONTEND_URL  = "http://localhost:3000"
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"   # override with wrangler secret put in dev if needed
+ENVIRONMENT       = "development"
+FRONTEND_URL      = "http://localhost:3000"
+WORKER_BASE_URL   = "https://omnibackend2.fweago-flavaz.workers.dev"
+
+# --- TRANSCRIPTION VARS ---
+# Your RunPod FastAPI endpoint + token used by the Worker
+TRANSCRIBE_ENDPOINT = "https://rvxah7xwk0ql9p-8000.proxy.runpod.net"
+TRANSCRIBE_TOKEN    = "omni3"
+
+ADMIN_API_TOKEN   = "DEV_ONLY_CHANGE_ME"   # or set as a secret for dev
 
 [[env.development.kv_namespaces]]
 binding = "CACHE"
@@ -84,9 +90,13 @@ class_name = "ProcessingStateV2"
 # ================== PREVIEW ==================
 [env.preview]
 [env.preview.vars]
-ENVIRONMENT   = "preview"
-FRONTEND_URL  = "https://omni2-8d2.pages.dev"
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+ENVIRONMENT       = "preview"
+FRONTEND_URL      = "https://omni2-8d2.pages.dev"
+WORKER_BASE_URL   = "https://omnibackend2.fweago-flavaz.workers.dev"
+
+# --- TRANSCRIPTION VARS ---
+TRANSCRIBE_ENDPOINT = "https://rvxah7xwk0ql9p-8000.proxy.runpod.net"
+TRANSCRIBE_TOKEN    = "omni3"
 
 [[env.preview.kv_namespaces]]
 binding = "CACHE"
@@ -119,14 +129,17 @@ class_name = "ProcessingStateV2"
 # ================== PRODUCTION ==================
 [env.production]
 [env.production.vars]
-ENVIRONMENT   = "production"
-FRONTEND_URL  = "https://fwea-i.com"
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-# Required secrets in prod (set with wrangler secret put --env production):
-#   STRIPE_SECRET_KEY
-#   AUDIO_URL_SECRET
-#   ADMIN_API_TOKEN
-#   STRIPE_WEBHOOK_SECRET
+ENVIRONMENT       = "production"
+FRONTEND_URL      = "https://fwea-i.com"
+WORKER_BASE_URL   = "https://omnibackend2.fweago-flavaz.workers.dev"
+
+# --- TRANSCRIPTION VARS ---
+# Swap to a stable domain when you have one; using RunPod for now:
+TRANSCRIBE_ENDPOINT = "https://rvxah7xwk0ql9p-8000.proxy.runpod.net"
+TRANSCRIBE_TOKEN    = "omni3"
+
+# Required prod secrets (set via: wrangler secret put --env production <NAME>)
+# STRIPE_SECRET_KEY, AUDIO_URL_SECRET, ADMIN_API_TOKEN, STRIPE_WEBHOOK_SECRET
 
 [[env.production.kv_namespaces]]
 binding = "CACHE"
@@ -156,12 +169,7 @@ dataset = "omni_analytics"
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
 
-# Optional: serve the API under your domain instead of *.workers.dev
+# Optional custom routing:
 # [[env.production.routes]]
 # pattern = "fwea-i.com/api/*"
 # zone_name = "fwea-i.com"
-
-# ===== Helper commands =====
-# Deploy dev:        npx wrangler deploy --env development
-# Deploy preview:    npx wrangler deploy --env preview
-# Deploy production: npx wrangler deploy --env production
