@@ -448,25 +448,28 @@ async function handlePaymentCreation(request, env, cors) {
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2024-06-20", httpClient: Stripe.createFetchHttpClient() });
     const isSubscription = (type === "dj_pro" || type === "studio_elite");
 
-    const session = await stripe.checkout.sessions.create({
-      mode: isSubscription ? "subscription" : "payment",
-      line_items: [{ price: priceId, quantity: 1 }],
-      // in worker.js
-      success_url: `${env.FRONTEND_URL.replace(/\/+$/,'')}/omni3?success=true&session_id=\${CHECKOUT_SESSION_ID}`,
-      cancel_url:  `${env.FRONTEND_URL.replace(/\/+$/,'')}/omni3?canceled=true`,
-      customer_email: email || undefined,
-      allow_promotion_codes: true,
-      automatic_tax: { enabled: true },
-      customer_creation: "if_required",
-      payment_method_types: ["card","link"],
-      metadata: {
-        type: type || "",
-        fileName: fileName || "",
-        fingerprint: fingerprint || "unknown",
-        processingType: "audio_cleaning",
-        ts: String(Date.now())
-      }
-    });
+    const frontBase  = env.FRONTEND_URL.replace(/\/+$/, "");
+const successUrl = `${frontBase}/omni3?success=true&session_id={CHECKOUT_SESSION_ID}`;
+const cancelUrl  = `${frontBase}/omni3?canceled=true`;
+
+const session = await stripe.checkout.sessions.create({
+  mode: isSubscription ? "subscription" : "payment",
+  line_items: [{ price: priceId, quantity: 1 }],
+  success_url: successUrl,
+  cancel_url: cancelUrl,
+  customer_email: email || undefined,
+  allow_promotion_codes: true,
+  automatic_tax: { enabled: true },
+  customer_creation: "if_required",
+  payment_method_types: ["card","link"],
+  metadata: {
+    type: type || "",
+    fileName: fileName || "",
+    fingerprint: fingerprint || "unknown",
+    processingType: "audio_cleaning",
+    ts: String(Date.now()),
+  },
+});
 
     return j({ success: true, sessionId: session.id, url: session.url }, 200, cors);
   } catch (e) {
