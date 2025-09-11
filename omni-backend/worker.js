@@ -149,46 +149,88 @@ function normalizeLangs(langs=[]){const map={english:'en',spanish:'es',french:'f
 
 // ---------- Main Worker ----------
 
-export default {
-  async fetch(request, env) {
-    const reqOrigin = request.headers.get('Origin') || '';
-    const workerOrigin = new URL(request.url).origin;
-    const configuredFrontend = (env.FRONTEND_URL || '').replace(/\/+$/,'');
-    const allowList = [
-      configuredFrontend,
-      workerOrigin,
-      'https://fwea-i.com',
-      'https://www.fwea-i.com',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-    ].filter(Boolean);
-
-    const allowOrigin =
-      allowList.includes(reqOrigin) ? reqOrigin : workerOrigin;
-
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': allowOrigin,
-      'Vary': 'Origin',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers':
-        'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
-      'Access-Control-Max-Age': '86400',
-      'Access-Control-Expose-Headers':
-        'content-range, accept-ranges, content-length, etag, content-type, last-modified',
-      'Cross-Origin-Resource-Policy': 'cross-origin',
-      'Timing-Allow-Origin': '*',
-    };
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders });
-    }
-
-    // ...handle routes...
-    const resp = await handleRoute(request, env);
-    return new Response(resp.body, { status: resp.status, headers: { ...resp.headers, ...corsHeaders }});
-  }
+// worker.js (modules syntax)
+function json(data, status = 200, headers = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', ...headers },
+  });
 }
 
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      return await route(request, env, ctx);
+    } catch (err) {
+      // never return at top level — only here inside fetch()
+      console.error('Worker fatal error:', err);
+      return json({ error: 'Internal Server Error', details: String(err?.message || err) }, 500);
+    }
+  },
+};
+
+// keep helpers and handlers below — no top-level returns
+async function route(request, env, ctx) {
+  const url = new URL(request.url);
+
+  // CORS (inside the function)
+  const allowList = [
+    env.FRONTEND_URL?.replace(/\/+$/, ''),
+    'https://fwea-i.com',
+    'https://www.fwea-i.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ].filter(Boolean);
+
+  const reqOrigin = request.headers.get('Origin') || '';
+  const allowOrigin = allowList.includes(reqOrigin) ? reqOrigin : '';
+  const cors = {
+    'Access-Control-Allow-Origin': allowOrigin || '*',
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, X-Stripe-Signature, Range, X-FWEA-Admin, X-Requested-With',
+    'Access-Control-Expose-Headers':
+      'Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type, Last-Modified',
+    'Access-Control-Max-Age': '86400',
+  };
+
+  // Preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
+  }
+
+  // Routes
+  if (request.method === 'POST' && url.pathname === '/process-audio') {
+    return await handleProcessAudio(request, env, cors);
+  }
+  if (request.method === 'POST' && url.pathname === '/create-payment') {
+    return await handleCreatePayment(request, env, cors);
+  }
+  if (request.method === 'POST' && url.pathname === '/activate-access') {
+    return await handleActivateAccess(request, env, cors);
+  }
+  if (request.method === 'POST' && url.pathname === '/track-event') {
+    return await handleTrackEvent(request, env, cors);
+  }
+  if (request.method === 'GET' && url.pathname === '/debug-env') {
+    // optional admin gate
+    return json({ ok: true, envKeys: Object.keys(env) }, 200, cors);
+  }
+
+  return json({ error: 'Not Found' }, 404, cors);
+}
+
+// Example handler — return only inside functions
+async function handleProcessAudio(request, env, cors) {
+  try {
+    const form = await request.formData();
+    // ... your logic ...
+    return json({ success: true, previewUrl: '...' }, 200, cors);
+  } catch (e) {
+    return json({ success: false, error: String(e?.message || e) }, 500, cors);
+  }
+}
 
 
     // Audio streaming
