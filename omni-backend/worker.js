@@ -406,11 +406,17 @@ async function handlePaymentCreation(request, env, corsHeaders) {
 
     
 // NEW (real)
-    const transcription = await callTranscriberWithFile(audioFile, env);
-    const detectedLanguages = extractLanguagesFromTranscription(transcription.text);
-    const normalizedLanguages = normalizeLangs(detectedLanguages);
+ // ---------- AI (real) ----------
+async function processAudioWithAI(audioFile, planType, fingerprint, env, request) {
+  try {
+    const audioBuffer = await audioFile.arrayBuffer();
 
-    const profanityResults = await findProfanityTimestamps(transcription, normalizedLanguages, env);
+    // Call your transcriber
+    const transcription = await callTranscriberWithFile(audioFile, env);
+
+    const detectedLanguages  = extractLanguagesFromTranscription(transcription.text);
+    const normalizedLanguages = normalizeLangs(detectedLanguages);
+    const profanityResults    = await findProfanityTimestamps(transcription, normalizedLanguages, env);
 
     const audioOutputs = await generateAudioOutputs(
       audioBuffer,
@@ -426,17 +432,17 @@ async function handlePaymentCreation(request, env, corsHeaders) {
 
     return {
       success: true,
-      previewUrl: audioOutputs.previewUrl,
+      previewUrl:   audioOutputs.previewUrl,
       fullAudioUrl: audioOutputs.fullAudioUrl,
-      languages: normalizedLanguages,
+      languages:    normalizedLanguages,
       profanityFound: profanityResults.timestamps?.length || 0,
       transcription: planType !== 'free' ? transcription : null,
-      quality: getQualityForPlan(planType),
-      watermarkId: audioOutputs.watermarkId
+      quality:      getQualityForPlan(planType),
+      watermarkId:  audioOutputs.watermarkId,
     };
-   catch (error) {
+  } catch (error) {
     console.error('AI processing error:', error);
-    return { success:false, error:'AI processing failed', details:error.message };
+    return { success: false, error: 'AI processing failed', details: error.message };
   }
 }
 
