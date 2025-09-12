@@ -4,17 +4,15 @@ compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
+# ---------- Shared defaults ----------
 [vars]
+# Intentionally empty to prevent root vars from overriding per-env settings.
+# Set FRONTEND_URL, WORKER_BASE_URL, and ENVIRONMENT inside each [env.*.vars] block below.
 
 # ---- KV (Cache) ----
 [[kv_namespaces]]
 binding = "CACHE"
 id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
-
-# ---- NEW: Profanity lists KV (global default) ----
-[[kv_namespaces]]
-binding = "PROFANITY_LISTS"
-id = "6a64a5d1cb7b4ac5bcaefaec65129a66"   # omni2-profanity-lists
 
 # ---- D1 Database ----
 [[d1_databases]]
@@ -27,44 +25,46 @@ database_id = "014dc18a-e6cc-4efd-85d6-97434f1d994e"
 binding = "AUDIO_STORAGE"
 bucket_name = "fwea-audio-files"
 
+# ---- Workers AI ----
 [ai]
 binding = "AI"
 
+# ---- Analytics Engine ----
 [[analytics_engine_datasets]]
 binding = "ANALYTICS"
 dataset = "omni_analytics"
 
+# ---- Durable Objects ----
 [[durable_objects.bindings]]
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
 
+# ---- Durable Object migrations ----
 [[migrations]]
 tag = "v1"
 new_classes = ["ProcessingStateV2"]
 
 [build]
 command = ""
+
 [placement]
 mode = "smart"
 
 # ================== DEVELOPMENT ==================
 [env.development]
 [env.development.vars]
-ENVIRONMENT     = "development"
-FRONTEND_URL    = "http://localhost:3000"
+ENVIRONMENT   = "development"
+FRONTEND_URL  = "http://localhost:3000"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-TRANSCRIBE_ENDPOINT = "https://rvxah7xwk0ql9p-8000.proxy.runpod.net"
-TRANSCRIBE_TOKEN    = "omni3"
-ADMIN_API_TOKEN     = "DEV_ONLY_CHANGE_ME"
+ADMIN_API_TOKEN = "DEV_ONLY_CHANGE_ME"   # override with wrangler secret put in dev if needed
 
 [[env.development.kv_namespaces]]
 binding = "CACHE"
 id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
-# use same profanity KV in dev
 [[env.development.kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "6a64a5d1cb7b4ac5bcaefaec65129a66"
+id = "PROFANITY_LISTS_DEV_ID"
 
 [[env.development.r2_buckets]]
 binding = "AUDIO_STORAGE"
@@ -84,20 +84,17 @@ class_name = "ProcessingStateV2"
 # ================== PREVIEW ==================
 [env.preview]
 [env.preview.vars]
-ENVIRONMENT     = "preview"
-FRONTEND_URL    = "https://omni2-8d2.pages.dev"
+ENVIRONMENT   = "preview"
+FRONTEND_URL  = "https://omni2-8d2.pages.dev"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-TRANSCRIBE_ENDPOINT = "https://rvxah7xwk0ql9p-8000.proxy.runpod.net"
-TRANSCRIBE_TOKEN    = "omni3"
 
 [[env.preview.kv_namespaces]]
 binding = "CACHE"
 id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
-# use same profanity KV in preview
 [[env.preview.kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "6a64a5d1cb7b4ac5bcaefaec65129a66"
+id = "PROFANITY_LISTS_DEV_ID"
 
 [[env.preview.d1_databases]]
 binding = "DB"
@@ -122,20 +119,23 @@ class_name = "ProcessingStateV2"
 # ================== PRODUCTION ==================
 [env.production]
 [env.production.vars]
-ENVIRONMENT     = "production"
-FRONTEND_URL    = "https://fwea-i.com"
+ENVIRONMENT   = "production"
+FRONTEND_URL  = "https://fwea-i.com"
 WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
-TRANSCRIBE_ENDPOINT = "https://rvxah7xwk0ql9p-8000.proxy.runpod.net"
-TRANSCRIBE_TOKEN    = "omni3"
+# Required secrets in prod (set with wrangler secret put --env production):
+#   STRIPE_SECRET_KEY (set with wrangler secret put STRIPE_SECRET_KEY --env production)
+#   STRIPE_PUBLISHABLE_KEY (optional: frontend may need this for Stripe.js)
+#   AUDIO_URL_SECRET
+#   ADMIN_API_TOKEN
+#   STRIPE_WEBHOOK_SECRET
 
 [[env.production.kv_namespaces]]
 binding = "CACHE"
 id = "8a95ca1107eb4a8f95e23d6b47cfeab4"
 
-# ✅ use same profanity KV in prod
 [[env.production.kv_namespaces]]
 binding = "PROFANITY_LISTS"
-id = "6a64a5d1cb7b4ac5bcaefaec65129a66"
+id = "PROFANITY_LISTS_PROD_ID"
 
 [[env.production.d1_databases]]
 binding = "DB"
@@ -156,3 +156,13 @@ dataset = "omni_analytics"
 [[env.production.durable_objects.bindings]]
 name = "PROCESSING_STATE_V2"
 class_name = "ProcessingStateV2"
+
+# Optional: serve the API under your domain instead of *.workers.dev
+# [[env.production.routes]]
+# pattern = "fwea-i.com/api/*"
+# zone_name = "fwea-i.com"
+
+# ===== Helper commands =====
+# Deploy dev:        npx wrangler deploy --env development
+# Deploy preview:    npx wrangler deploy --env preview
+# Deploy production: npx wrangler deploy --env production
