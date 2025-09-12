@@ -1019,7 +1019,7 @@ async function processFile(file){
   const fp = FWEA_AUTH.generateFingerprint();
   const plan = accessState?.plan || 'free';
 
-  try{
+  try {
     const fd = new FormData();
     fd.append('audio', file);        // MUST match Worker
     fd.append('fingerprint', fp);
@@ -1027,49 +1027,71 @@ async function processFile(file){
 
     const res = await fetch(`${CONFIG.API_BASE_URL}/process-audio`, {
       method: 'POST',
-      headers: { ...getAdminHeaders() }, // don't set Content-Type when using FormData
+      headers: { ...getAdminHeaders() }, // IMPORTANT: do not set Content-Type when sending FormData
       body: fd
     });
-    const json = await res.json();
-    if(!res.ok || !json.success) throw new Error(json?.error || 'Processing failed');
 
-    // fill UI from backend response
-    // expects: previewUrl, fullAudioUrl, detectedLanguages, wordsRemoved, previewDuration
-    if(Array.isArray(json.detectedLanguages)){
+    // Parse response safely (JSON or text)
+    const ct = res.headers.get('content-type') || '';
+    let json = null, text = '';
+    if (ct.includes('application/json')) {
+      json = await res.json().catch(() => null);
+    } else {
+      text = await res.text().catch(() => '');
+    }
+
+    // Handle HTTP errors with specific messages
+    if (!res.ok || !json?.success) {
+      const msg = (json && (json.error || json.details)) || text || `Request failed (${res.status})`;
+      if (res.status === 403) throw new Error('Access denied – missing or invalid admin token.');
+      if (res.status === 413) throw new Error(`File too large (${(file.size/1048576).toFixed(1)}MB).`);
+      if (res.status === 502 || res.status === 504) throw new Error('Backend temporarily unavailable. Please try again.');
+      throw new Error(msg || 'Processing failed');
+    }
+
+    // Expect a preview URL; fail clearly if absent (mixed content/CORS/etc.)
+    const previewUrl = json.previewUrl ? normalizePreviewUrl(json.previewUrl) : '';
+    if (!previewUrl) {
+      throw new Error('Audio processed, but no preview URL was returned (or it was blocked).');
+    }
+
+    // Update UI with detection results
+    if (Array.isArray(json.detectedLanguages)) {
       el.detectedLanguages.innerHTML = '';
-      json.detectedLanguages.forEach((lang,i)=>{
+      json.detectedLanguages.forEach((lang, i) => {
         const tag = document.createElement('span');
-        tag.className='language-tag'; tag.textContent=lang;
-        setTimeout(()=>el.detectedLanguages.appendChild(tag), i*150);
+        tag.className = 'language-tag';
+        tag.textContent = lang;
+        setTimeout(() => el.detectedLanguages.appendChild(tag), i * 150);
       });
     }
     el.wordsRemoved.textContent = json.wordsRemoved ?? 0;
     el.languagesDetected.textContent = Array.isArray(json.detectedLanguages) ? json.detectedLanguages.length : 1;
 
-    // ready player
-    const safePreview = normalizePreviewUrl(json.previewUrl);
-    el.player.src = safePreview;
-    // attach preview cap immediately
+    // Prepare the player
+    el.player.src = previewUrl;
     attachPreviewCap(el.player, getPreviewCapSeconds());
-    // ensure UI shows when media is actually ready (also handled in DOMContentLoaded listener)
-    if(el.player.readyState >= 1){ el.player.style.display = 'block'; }
-    // update display at start
+    if (el.player.readyState >= 1) { el.player.style.display = 'block'; }
     syncPlayerTime();
 
-    // finish progress & reveal player
-    finishProgress().then(()=>completeProcessing());
+    // Progress/UI
+    await finishProgress();
+    completeProcessing();
 
-    // store full url in memory (not exposed in DOM)
+    // Save URLs in memory only
     window.__fweaPreviewUrl = json.previewUrl;
     window.__fweaFullUrl = json.fullAudioUrl || null;
 
     ANALYTICS.conversion('preview_completed', plan);
-  }catch(err){
-    console.error(err);
-    showError('⚠️ Audio processed, but preview failed to load. Please try again or check CORS/mixed-content.');
-    isProcessing=false;
-    el.processing.style.display='none';
-    document.querySelector('.upload-section').style.display='block';
+  } catch (err) {
+    console.error('processFile error:', err);
+    const msg = String(err?.message || err);
+    // Use the specific message if we have one; otherwise show a generic failure
+    showError(msg.startsWith('Audio processed') ? msg : `Processing failed: ${msg}`);
+    // Reset UI state
+    isProcessing = false;
+    el.processing.style.display = 'none';
+    document.querySelector('.upload-section').style.display = 'block';
   }
 }
 
