@@ -119,9 +119,11 @@ class_name = "ProcessingStateV2"
 # ================== PRODUCTION ==================
 [env.production]
 [env.production.vars]
-ENVIRONMENT   = "production"
-FRONTEND_URL  = "https://fwea-i.com"
-WORKER_BASE_URL = "https://omnibackend2.fweago-flavaz.workers.dev"
+ENVIRONMENT        = "production"
+FRONTEND_URL       = "https://fwea-i.com"
+WORKER_BASE_URL    = "https://omnibackend2.fweago-flavaz.workers.dev"
+TRANSCRIBE_ENDPOINT = "https://api.runpod.net/proxy/v2/omni3-transcribe"
+TRANSCRIBE_TOKEN   = "omni3"
 # Required secrets in prod (set with wrangler secret put --env production):
 #   STRIPE_SECRET_KEY (set with wrangler secret put STRIPE_SECRET_KEY --env production)
 #   STRIPE_PUBLISHABLE_KEY (optional: frontend may need this for Stripe.js)
