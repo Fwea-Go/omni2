@@ -1157,44 +1157,89 @@ function completeProcessing(){
 // Player
 ///////////////////////
 function togglePlayback(){
-  if(!el.player.src) return;
-  if(el.player.paused){
-    el.player.play(); el.playBtn.textContent='⏸️'; window.dispatchEvent(new Event('audio-play'));
-  }else{
-    el.player.pause(); el.playBtn.textContent='▶️'; window.dispatchEvent(new Event('audio-pause'));
+  if(!el.player || !el.player.src) return;
+
+  // ensure the media element is ready
+  if (el.player.readyState < 2) {
+    try { el.player.load(); } catch {}
+  }
+
+  if (el.player.paused){
+    const playPromise = el.player.play();
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise.then(()=>{
+        el.playBtn.textContent='⏸️';
+        window.dispatchEvent(new Event('audio-play'));
+      }).catch(err=>{
+        console.warn('Autoplay blocked or playback failed:', err);
+        showWarning('Tap the play button to start the preview.');
+        el.playBtn.textContent='▶️';
+      });
+    } else {
+      // older browsers
+      el.playBtn.textContent='⏸️';
+      window.dispatchEvent(new Event('audio-play'));
+    }
+  } else {
+    el.player.pause();
+    el.playBtn.textContent='▶️';
+    window.dispatchEvent(new Event('audio-pause'));
   }
 }
+
 function syncPlayerTime(){
   const cap = getPreviewCapSeconds();
-  const cur = Math.min(cap, Math.floor(el.player.currentTime || 0));
-  // use the smaller of media duration and cap for display
-  const mediaDur = Math.floor(el.player.duration || cap);
-  const dur = Math.min(mediaDur, cap);
-  el.timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+  const cur = Math.min(cap, Math.floor(el.player?.currentTime || 0));
+  // Use the smaller of media duration and cap for display; guard NaN/Infinity
+  const rawDur = Number.isFinite(el.player?.duration) ? el.player.duration : cap;
+  const mediaDur = Math.max(0, Math.floor(rawDur || cap));
+  const dur = Math.min(mediaDur || cap, cap);
+  if (el.timeDisplay) el.timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
 }
-function formatTime(s){ const m=Math.floor(s/60), ss=(s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
+
+function formatTime(s){
+  s = Math.max(0, Math.floor(s || 0));
+  const m = Math.floor(s/60);
+  const ss = (s%60).toString().padStart(2,'0');
+  return `${m}:${ss}`;
+}
 
 ///////////////////////
 // Preview cap enforcement
 ///////////////////////
 function attachPreviewCap(audioEl, seconds) {
-  // remove any previous handler
+  // remove any previous handlers
   if (audioEl._capHandler) {
     audioEl.removeEventListener('timeupdate', audioEl._capHandler);
   }
+  if (audioEl._seekHandler) {
+    audioEl.removeEventListener('seeking', audioEl._seekHandler);
+  }
+
   const limit = Math.max(1, Number(seconds || getPreviewCapSeconds()));
-  const handler = () => {
-    // hard stop at the cap
+
+  const stopAtCap = () => {
     if ((audioEl.currentTime || 0) >= limit) {
       audioEl.pause();
-      audioEl.currentTime = Math.max(0, limit - 0.15); // nudge back for replay feel
+      // nudge back a touch so replay feels responsive
+      audioEl.currentTime = Math.max(0, limit - 0.15);
       const playBtn = document.getElementById('playBtn');
       if (playBtn) playBtn.textContent = '▶️';
       window.dispatchEvent(new Event('audio-pause'));
     }
   };
-  audioEl._capHandler = handler;
-  audioEl.addEventListener('timeupdate', handler);
+
+  const clampSeeking = () => {
+    if ((audioEl.currentTime || 0) > limit) {
+      audioEl.currentTime = Math.max(0, limit - 0.01);
+    }
+  };
+
+  audioEl._capHandler = stopAtCap;
+  audioEl._seekHandler = clampSeeking;
+
+  audioEl.addEventListener('timeupdate', stopAtCap);
+  audioEl.addEventListener('seeking', clampSeeking);
 }
 
 ///////////////////////
@@ -1207,12 +1252,21 @@ async function startCheckout(type, priceId, amount){
     const fp = FWEA_AUTH.generateFingerprint();
     const email = null; // optional: collect via modal if you want prefill
     const r = await fetch(`${CONFIG.API_BASE_URL}/create-payment`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ priceId, type, fileName: currentFile?.name || 'audio_track', email, fingerprint: fp })
     });
     const j = await r.json();
     if(!r.ok) throw new Error(j?.error || 'Payment error');
-    await stripe.redirectToCheckout({ sessionId: j.sessionId });
+
+    // Try Stripe first (may be blocked in iframes)
+    try { await stripe.redirectToCheckout({ sessionId: j.sessionId }); } catch {}
+
+    // Hard redirect as a reliable fallback (breaks out of iframe)
+    if (j?.url) {
+      window.top.location.href = j.url;
+      return;
+    }
   }catch(e){
     console.error(e);
     showError('Payment processing failed. Please try again.');
