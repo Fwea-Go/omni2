@@ -694,6 +694,14 @@ const CONFIG = {
 };
 
 ///////////////////////
+// Preview cap helper — 60s for studio_elite, otherwise 30s
+function getPreviewCapSeconds() {
+  return (accessState && accessState.plan === 'studio_elite')
+    ? (CONFIG.STUDIO_PREVIEW_DURATION || 60)
+    : (CONFIG.PREVIEW_DURATION || 30);
+}
+
+///////////////////////
 // Admin token helpers
 ///////////////////////
 function getAdminToken(){
@@ -951,6 +959,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   el.playBtn.addEventListener('click', togglePlayback);
   el.player.addEventListener('timeupdate', syncPlayerTime);
   el.player.addEventListener('ended', ()=>{ el.playBtn.textContent='▶️'; window.dispatchEvent(new Event('audio-pause')); });
+  // re-attach cap after a new source loads
+  el.player.addEventListener('loadedmetadata', () => {
+    attachPreviewCap(el.player, getPreviewCapSeconds());
+    // ensure initial time display reflects the cap
+    syncPlayerTime();
+  });
 
   // language banner
   const lane = document.getElementById('languageScroll');
@@ -1035,8 +1049,12 @@ async function processFile(file){
     // ready player
     const safePreview = normalizePreviewUrl(json.previewUrl);
     el.player.src = safePreview;
+    // attach preview cap immediately
+    attachPreviewCap(el.player, getPreviewCapSeconds());
     // ensure UI shows when media is actually ready (also handled in DOMContentLoaded listener)
     if(el.player.readyState >= 1){ el.player.style.display = 'block'; }
+    // update display at start
+    syncPlayerTime();
 
     // finish progress & reveal player
     finishProgress().then(()=>completeProcessing());
@@ -1125,11 +1143,37 @@ function togglePlayback(){
   }
 }
 function syncPlayerTime(){
-  const cur = Math.floor(el.player.currentTime||0);
-  const dur = Math.floor(el.player.duration|| (accessState.plan==='studio_elite'?CONFIG.STUDIO_PREVIEW_DURATION:CONFIG.PREVIEW_DURATION));
+  const cap = getPreviewCapSeconds();
+  const cur = Math.min(cap, Math.floor(el.player.currentTime || 0));
+  // use the smaller of media duration and cap for display
+  const mediaDur = Math.floor(el.player.duration || cap);
+  const dur = Math.min(mediaDur, cap);
   el.timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
 }
 function formatTime(s){ const m=Math.floor(s/60), ss=(s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
+
+///////////////////////
+// Preview cap enforcement
+///////////////////////
+function attachPreviewCap(audioEl, seconds) {
+  // remove any previous handler
+  if (audioEl._capHandler) {
+    audioEl.removeEventListener('timeupdate', audioEl._capHandler);
+  }
+  const limit = Math.max(1, Number(seconds || getPreviewCapSeconds()));
+  const handler = () => {
+    // hard stop at the cap
+    if ((audioEl.currentTime || 0) >= limit) {
+      audioEl.pause();
+      audioEl.currentTime = Math.max(0, limit - 0.15); // nudge back for replay feel
+      const playBtn = document.getElementById('playBtn');
+      if (playBtn) playBtn.textContent = '▶️';
+      window.dispatchEvent(new Event('audio-pause'));
+    }
+  };
+  audioEl._capHandler = handler;
+  audioEl.addEventListener('timeupdate', handler);
+}
 
 ///////////////////////
 // Pricing / Stripe
