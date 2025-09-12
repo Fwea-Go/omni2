@@ -705,10 +705,10 @@ function getPreviewCapSeconds() {
 // Admin token helpers
 ///////////////////////
 function getAdminToken(){
-  try { return sessionStorage.getItem('FWEA_ADMIN_TOKEN') || ''; } catch { return ''; }
+  try { return sessionStorage.getItem('ADMIN_API_TOKEN') || ''; } catch { return ''; }
 }
 function setAdminToken(tok){
-  try { if(typeof tok === 'string') sessionStorage.setItem('FWEA_ADMIN_TOKEN', tok.trim()); } catch {}
+  try { if(typeof tok === 'string') sessionStorage.setItem('ADMIN_API_TOKEN', tok.trim()); } catch {}
 }
 function getAdminHeaders(){
   const tok = getAdminToken();
@@ -1253,7 +1253,7 @@ function notify(message, type){
   if(toggle){ toggle.checked = isAdmin; }
   if(tokenInput){
     try {
-      const existingTok = sessionStorage.getItem('FWEA_ADMIN_TOKEN') || '';
+      const existingTok = sessionStorage.getItem('ADMIN_API_TOKEN') || '';
       tokenInput.value = existingTok;
     } catch {}
   }
